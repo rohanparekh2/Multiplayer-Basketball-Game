@@ -1,12 +1,105 @@
-**Description:** For my final project, I created a multiplayer baksetball game where each player gets to select what type of shot they want to take while on offense and what type of defense to play whil they are defending. The offensive player also gets to select their shot power. A shot that is closer to the basket requires lower power, while a farther shot requires higher power. I created an equation that takes the type of shot, defense, and power into account, and then randomizes the result to see if the shot is made. An animation showing if the shot is made will follow, and then the players switch sides. The game ends when one player reaches 10 points or someone presses the quit button.
+# Court Kings Showdown
 
+A modern multiplayer basketball game built with Next.js, React Three Fiber, and FastAPI.
 
-**Controls:** Click a button on the screen to choose a shot
+## Tech Stack
 
-Press the spacebar to select the shot power
+- **Frontend**: Next.js 14, React 18, Three.js (React Three Fiber), Tailwind CSS
+- **Backend**: FastAPI (Python), WebSockets
+- **Architecture**: REST API + WebSocket for real-time updates
 
-Press Return to move onto the next turn
+## Features
 
+- 3D basketball court with Three.js
+- Real-time multiplayer gameplay
+- Shot selection (Layup, Midrange, Three-Pointer, Half Court)
+- Defense selection (Block, Steal, Contest)
+- Power meter for shot accuracy
+- Animated ball trajectory
+- Modern UI with Tailwind CSS
 
-![Animated GIF-downsized_large (1)](https://user-images.githubusercontent.com/32373675/117377328-a3b8ee80-ae98-11eb-8e9a-250537c979e8.gif)
+## Setup
 
+### Backend
+
+1. Navigate to backend directory:
+```bash
+cd backend
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run the server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+API docs available at: http://localhost:8000/docs
+
+### Frontend
+
+1. Navigate to frontend directory:
+```bash
+cd frontend
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Create `.env.local`:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_WS_URL=ws://localhost:8000
+```
+
+4. Run the development server:
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+## Game Flow
+
+1. Game starts automatically
+2. Offensive player selects shot type
+3. Defensive player selects defense type
+4. Offensive player selects power (press SPACEBAR)
+5. Ball animation plays
+6. Result is displayed
+7. Players switch turns
+8. First to 10 points wins
+
+## Project Structure
+
+```
+├── backend/
+│   ├── app/
+│   │   ├── api/          # REST API endpoints
+│   │   ├── models/       # Game logic models
+│   │   ├── services/     # Business logic
+│   │   ├── schemas/      # Pydantic schemas
+│   │   └── websocket/    # WebSocket handlers
+│   └── requirements.txt
+├── frontend/
+│   ├── app/              # Next.js app directory
+│   ├── components/       # React components
+│   ├── hooks/            # Custom hooks
+│   ├── services/         # API clients
+│   └── types/            # TypeScript types
+└── README.md
+```
+
+## Future Enhancements
+
+- AI opponent integration
+- Player statistics tracking
+- Game history/replay
+- Sound effects
+- Enhanced 3D graphics
+- Multiplayer rooms
