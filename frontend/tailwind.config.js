@@ -34,6 +34,11 @@ module.exports = {
           600: '#16a34a',
           700: '#15803d',
         },
+        accent: {
+          mint: '#10b981',
+          blue: '#3b82f6',
+          electric: '#06b6d4',
+        },
         error: {
           50: '#fef2f2',
           100: '#fee2e2',

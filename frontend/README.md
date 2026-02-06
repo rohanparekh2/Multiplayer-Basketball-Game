@@ -1,6 +1,6 @@
 # Basketball Game Frontend
 
-Next.js frontend with React Three Fiber for 3D graphics.
+Next.js frontend with SVG-based 2D graphics and Framer Motion animations.
 
 ## Setup
 
@@ -28,11 +28,12 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 - `app/` - Next.js app directory
 - `components/` - React components
-  - `GameCanvas/` - Three.js scene
-  - `Court/` - 3D basketball court
-  - `Basketball/` - Animated basketball
+  - `GameCanvas/` - SVG game canvas container
+  - `Court/` - SVG basketball court
+  - `Basketball/` - SVG basketball with animations
   - `UI/` - Game UI components
 - `hooks/` - Custom React hooks
 - `services/` - API and WebSocket clients
 - `types/` - TypeScript type definitions
+- `utils/` - Utility functions (trajectory calculations)
 

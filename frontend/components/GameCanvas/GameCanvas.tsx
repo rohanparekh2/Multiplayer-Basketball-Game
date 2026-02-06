@@ -1,17 +1,15 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { Court } from '../Court/Court'
-import { Basketball } from '../Basketball/Basketball'
-import { CameraControls } from './CameraControls'
 import { useGameState } from '@/hooks/useGameState'
-import { BallAnimation } from '../Basketball/BallAnimation'
 import { gameApi } from '@/services/api'
+import { SVGCourt } from '../Court/SVGCourt'
+import { SVGBasketball } from '../Basketball/SVGBasketball'
+import { SVGBallAnimation } from '../Basketball/SVGBallAnimation'
+import { ANCHORS } from '../Court/courtConstants'
 
 export function GameCanvas() {
   const { gameState, refreshGameState } = useGameState()
-  const [showAnimation, setShowAnimation] = useState(false)
   const [animationMade, setAnimationMade] = useState(false)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const gameStateRef = useRef(gameState)
@@ -24,25 +22,15 @@ export function GameCanvas() {
   const handleAnimationComplete = useCallback(async () => {
     console.log('🎬 Animation complete callback called')
     
-    // Prevent multiple calls
-    if (animationTimeoutRef.current === null && !showAnimation) {
-      console.warn('⚠️ Animation already completed, ignoring duplicate call')
-      return
-    }
-    
     // Clear timeout if it exists
     if (animationTimeoutRef.current) {
       clearTimeout(animationTimeoutRef.current)
       animationTimeoutRef.current = null
     }
     
-    // Stop animation immediately
-    setShowAnimation(false)
-    
     const roomId = gameState?.room_id
     if (!roomId) {
       console.error('❌ No room_id available for finishAnimation')
-      // Try to get room_id from ref as fallback
       const refRoomId = gameStateRef.current?.room_id
       if (refRoomId) {
         console.log('🔄 Using room_id from ref:', refRoomId)
@@ -52,10 +40,9 @@ export function GameCanvas() {
     }
     
     await handleAnimationCompleteWithRoomId(roomId)
-  }, [gameState?.room_id, showAnimation, refreshGameState])
+  }, [gameState?.room_id, refreshGameState])
 
   const handleAnimationCompleteWithRoomId = useCallback(async (roomId: string) => {
-    // Validate current state before proceeding
     const currentState = gameStateRef.current?.state
     if (currentState !== 'animating') {
       console.warn('⚠️ State is not animating, skipping finishAnimation:', currentState)
@@ -65,16 +52,13 @@ export function GameCanvas() {
     try {
       console.log('🎬 Notifying backend that animation is complete...', { roomId })
       
-      // Call finishAnimation API
       const response = await gameApi.finishAnimation(roomId)
       console.log('✅ Animation finished response:', response)
       
-      // Validate response
       if (response?.game_state) {
         const newState = response.game_state.state
         console.log('✅ State transition:', { from: 'animating', to: newState })
         
-        // Force immediate state refresh
         const refreshSuccess = await refreshGameState(roomId)
         if (!refreshSuccess) {
           console.warn('⚠️ State refresh failed, but API call succeeded')
@@ -84,23 +68,16 @@ export function GameCanvas() {
         await refreshGameState(roomId)
       }
       
-      // Double-check after 500ms
       setTimeout(async () => {
         const checkState = gameStateRef.current?.state
         if (checkState === 'animating') {
           console.warn('⚠️ Still animating after finishAnimation, forcing refresh again')
-          await refreshGameState(roomId, 2) // Retry with 2 attempts
+          await refreshGameState(roomId, 2)
         }
       }, 500)
     } catch (error: any) {
       console.error('❌ Failed to notify animation complete:', error)
-      console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      })
       
-      // Fallback: try to refresh state anyway
       console.log('🔄 Attempting to refresh game state as fallback...')
       try {
         const refreshSuccess = await refreshGameState(roomId, 2)
@@ -113,135 +90,136 @@ export function GameCanvas() {
     }
   }, [refreshGameState])
 
+  const animationStateRef = useRef<string | null>(null)
+  
   useEffect(() => {
     console.log('🎬 GameCanvas state check:', {
       state: gameState?.state,
       shot_result: gameState?.shot_result,
       room_id: gameState?.room_id,
-      power: gameState?.power,
-      player_one_score: gameState?.player_one?.score,
-      player_two_score: gameState?.player_two?.score,
-      showAnimation,
     })
     
-    // Check for animating state - the state should be 'animating' after power is selected
-    if (gameState?.state === 'animating') {
-      console.log('✅ State is animating!')
-      
-      // shot_result should be set by backend when power is selected
-      // If shot_result is null, use false as default (missed shot)
+    // Only start animation if state changed to 'animating' (not if already animating)
+    if (gameState?.state === 'animating' && animationStateRef.current !== 'animating') {
       const shotResult = gameState.shot_result !== null && gameState.shot_result !== undefined 
         ? gameState.shot_result 
         : false
       
       console.log('✅ Starting animation with shot_result:', shotResult)
-      console.log('✅ Scores:', {
-        player_one: gameState.player_one?.score,
-        player_two: gameState.player_two?.score,
-      })
-      
-      // Always start animation when state is animating
-      console.log('🎬 Animation trigger check:', {
-        showAnimation,
-        state: gameState.state,
-        shotResult,
-        room_id: gameState.room_id,
-      })
-      
-      if (!showAnimation) {
-        console.log('🎬 Setting showAnimation to true - animation should start now')
-        setShowAnimation(true)
-      }
       setAnimationMade(shotResult)
+      animationStateRef.current = 'animating'
       
-      // Also ensure animation component will render by logging
-      console.log('🎬 Animation props:', {
-        startPosition: [0, 2, 0],
-        endPosition: shotResult ? [0, 3, -9.5] : [2, 1, -9],
-        made: shotResult,
-      })
-      
-      // Fallback: Auto-advance after 5.5 seconds if animation doesn't complete
-      // This ensures we never get stuck even if onComplete never fires
-      // Increased to 5.5 seconds to allow the full animation to play (3s animation + 1.5s delay + buffer)
+      // Fallback timeout (only if animation doesn't complete naturally)
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current)
       }
       animationTimeoutRef.current = setTimeout(async () => {
         const currentState = gameStateRef.current?.state
         const currentRoomId = gameStateRef.current?.room_id
-        console.warn('⚠️ Animation timeout - forcing completion after 5.5 seconds')
-        console.warn('⚠️ Current state:', currentState, 'showAnimation:', showAnimation, 'roomId:', currentRoomId)
+        console.warn('⚠️ Animation timeout - forcing completion after 5 seconds')
         
+        // Only force completion if still in animating state
         if (currentState === 'animating' && currentRoomId) {
-          console.log('🎬 Timeout: Calling handleAnimationComplete')
           try {
             await handleAnimationComplete()
           } catch (err) {
-            console.error('❌ Error in timeout handler, trying direct API call:', err)
-            // Last resort: call finishAnimation directly
+            console.error('❌ Error in timeout handler:', err)
             try {
-              const response = await gameApi.finishAnimation(currentRoomId)
-              console.log('✅ Direct finishAnimation call succeeded:', response)
+              await gameApi.finishAnimation(currentRoomId)
               await refreshGameState(currentRoomId)
             } catch (apiErr) {
               console.error('❌ Direct finishAnimation also failed:', apiErr)
             }
           }
         }
-      }, 5500) // 5.5 seconds - enough for 3s animation + 1.5s delay + buffer
-    } else {
-      if (showAnimation && gameState?.state !== 'animating') {
-        console.log('🛑 Stopping animation, state changed to:', gameState?.state)
-        setShowAnimation(false)
-      }
-      if (animationTimeoutRef.current) {
-        clearTimeout(animationTimeoutRef.current)
-        animationTimeoutRef.current = null
-      }
+      }, 5000) // Increased to 5 seconds to avoid conflicts with natural completion
+    } else if (gameState?.state !== 'animating') {
+      // Reset animation state when leaving animating state
+      animationStateRef.current = null
     }
     
     return () => {
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current)
+        animationTimeoutRef.current = null
       }
     }
-  }, [gameState?.state, gameState?.shot_result, gameState?.room_id, gameState?.power, gameState?.player_one?.score, gameState?.player_two?.score, handleAnimationComplete, showAnimation])
+  }, [gameState?.state, gameState?.shot_result, gameState?.room_id, handleAnimationComplete, refreshGameState])
+
+  // Calculate ball position for static display using ANCHORS
+  const getBallPosition = () => {
+    if (!gameState) return ANCHORS.startBall
+    return ANCHORS.startBall
+  }
+
+  const ballPos = getBallPosition()
+  const debug = process.env.NODE_ENV === 'development' && false // Set to true to enable debug overlay
+
+  // #region agent log
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mainEl = document.querySelector('main[role="main"]');
+      const svgEl = document.querySelector('svg');
+      const containerEl = document.querySelector('.game-canvas-container');
+      
+      const mainRect = mainEl?.getBoundingClientRect();
+      const svgRect = svgEl?.getBoundingClientRect();
+      const containerRect = containerEl?.getBoundingClientRect();
+      
+      const mainStyle = mainEl ? window.getComputedStyle(mainEl as Element) : null;
+      const containerStyle = containerEl ? window.getComputedStyle(containerEl as Element) : null;
+      
+      fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameCanvas.tsx:147',message:'Rendered dimensions check',data:{mainRect:{w:mainRect?.width,h:mainRect?.height,x:mainRect?.x,y:mainRect?.y},svgRect:{w:svgRect?.width,h:svgRect?.height,x:svgRect?.x,y:svgRect?.y},containerRect:{w:containerRect?.width,h:containerRect?.height,x:containerRect?.x,y:containerRect?.y},mainBg:mainStyle?.backgroundImage || 'none',containerBg:containerStyle?.backgroundColor || 'transparent',viewport:{w:window.innerWidth,h:window.innerHeight}},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    }
+  }, []);
+  // #endregion
+
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    const containerEl = typeof document !== 'undefined' ? document.querySelector('.game-canvas-container') : null;
+    const computedStyle = containerEl ? window.getComputedStyle(containerEl as Element) : null;
+    fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameCanvas.tsx:149',message:'GameCanvas render',data:{hasBgTransparent:true,containerCount:3,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,bgColor:computedStyle?.backgroundColor || 'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  }
+  // #endregion
 
   return (
-    <Canvas
-      camera={{ position: [0, 15, 20], fov: 50 }}
-      gl={{ antialias: true }}
-      className="w-full h-full"
-    >
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 15, 5]} intensity={1.2} castShadow />
-      <directionalLight position={[-10, 10, -5]} intensity={0.4} />
-      <pointLight position={[0, 12, 0]} intensity={0.3} />
-      <fog attach="fog" args={['#1a1a1a', 30, 50]} />
-      
-      <Court />
-      
-      {/* Always render BallAnimation when state is animating - don't rely on showAnimation state */}
-      {gameState?.state === 'animating' ? (
-        <BallAnimation
-          key={`animation-${gameState?.shot_result}-${gameState?.power}`}
-          startPosition={[0, 2, 0]}
-          endPosition={animationMade ? [0, 3, -9.5] : [2, 1, -9]}
-          made={animationMade}
-          onComplete={() => {
-            console.log('🎬 BallAnimation onComplete called from GameCanvas')
-            handleAnimationComplete().catch((err) => {
-              console.error('❌ Error in handleAnimationComplete:', err)
-            })
-          }}
-        />
-      ) : (
-        <Basketball position={[0, 2, 0]} visible={gameState?.state === 'waiting_for_power' || gameState?.state === 'waiting_for_shot'} />
-      )}
-      
-      <CameraControls />
-    </Canvas>
+    <div className="relative w-full h-full flex items-center justify-center">
+      {/* #region agent log */}
+      {typeof window !== 'undefined' && (() => {
+        fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameCanvas.tsx:177',message:'GameCanvas render',data:{viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,hasGameState:!!gameState},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        return null;
+      })()}
+      {/* #endregion */}
+      {/* Court image */}
+      <div className="relative w-full h-full">
+        <SVGCourt debug={debug} />
+        
+        {/* Render ball or animation based on state */}
+        {gameState?.state === 'animating' ? (
+          <SVGBallAnimation
+            key={`animation-${gameState?.shot_result}-${gameState?.power}`}
+            startPosition={[0, 2, 0]}
+            endPosition={animationMade ? [0, 3, -9.5] : [2, 1, -9]}
+            made={animationMade}
+            onComplete={() => {
+              console.log('🎬 SVGBallAnimation onComplete called')
+              handleAnimationComplete().catch((err) => {
+                console.error('❌ Error in handleAnimationComplete:', err)
+              })
+            }}
+            debug={debug}
+          />
+        ) : (
+          (gameState?.state === 'waiting_for_power' || gameState?.state === 'waiting_for_shot') && (
+            <SVGBasketball
+              x={ballPos.x}
+              y={ballPos.y}
+              size={40}
+              rotating={false}
+            />
+          )
+        )}
+      </div>
+    </div>
   )
 }
-

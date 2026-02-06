@@ -6,6 +6,7 @@ import { ShotSelection } from './ShotSelection'
 import { DefenseSelection } from './DefenseSelection'
 import { PowerMeter } from './PowerMeter'
 import { Scoreboard } from './Scoreboard'
+import { LeftControlPanel } from './LeftControlPanel'
 import { Button } from './Button'
 import { Card } from './Card'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -20,7 +21,7 @@ import { GameState as GameStateEnum } from '@/types/game'
 import { Trophy, CheckCircle2, XCircle, RefreshCw, SkipForward } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export function GameUI() {
+export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overlay' }) {
   const { gameState, createGame, loading, error, actionLoading, nextTurn, isPolling, wsConnected } = useGameState()
   const { toasts, showToast, removeToast } = useToast()
   const { logs, addLog } = useDebug()
@@ -185,7 +186,7 @@ export function GameUI() {
     // Show error overlay if there's an error and we're not loading
     if (error && !loading) {
       return (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50 pointer-events-auto">
           <Card variant="strong" className="text-center max-w-md mx-auto">
             <h2 className="text-2xl font-display text-error-400 mb-4">Failed to Load Game</h2>
             <p className="text-white/80 mb-6">{error}</p>
@@ -205,6 +206,76 @@ export function GameUI() {
     return <LoadingScreen />
   }
 
+  // Right mode: Only scoreboard
+  if (mode === 'right') {
+    if (!gameState) return null
+    return <Scoreboard gameState={gameState} />
+  }
+
+  // Left mode: Only controls (no BottomControlBar, no scoreboard)
+  if (mode === 'left') {
+    if (!gameState) return null
+    
+    return (
+      <>
+        {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
+          <LeftControlPanel
+            title={String(gameState.current_offensive_player ?? 'Player')}
+            subtitle="Choose your shot"
+          >
+            <ShotSelection gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.WAITING_FOR_DEFENSE && gameState.room_id && (
+          <LeftControlPanel
+            title={String(gameState.current_defensive_player ?? 'Player')}
+            subtitle="Choose your defense"
+          >
+            <DefenseSelection gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.WAITING_FOR_POWER && gameState.room_id && (
+          <LeftControlPanel
+            title={String(gameState.current_offensive_player ?? 'Player')}
+            subtitle="Select power"
+          >
+            <PowerMeter gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.ANIMATING && (
+          <LeftControlPanel title="Shooting..." subtitle="Watch the ball!">
+            <div />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.SHOT_RESULT && gameState.shot_result !== null && (
+          <LeftControlPanel
+            title={gameState.shot_result ? 'Made!' : 'Missed!'}
+            subtitle={gameState.shot_result ? 'Great shot!' : 'Better luck next time'}
+          >
+            <button
+              onClick={handleNextTurn}
+              disabled={actionLoading === 'nextTurn'}
+              className="w-full py-4 px-6 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg shadow-2xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading === 'nextTurn' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  <span>Next Turn</span>
+                </>
+              )}
+            </button>
+          </LeftControlPanel>
+        )}
+      </>
+    )
+  }
+
+  // Overlay mode (default): Full UI with scoreboard and controls
   return (
     <>
       <ToastContainer toasts={toasts} onClose={removeToast} />
@@ -237,160 +308,110 @@ export function GameUI() {
         </motion.div>
       )}
       
-      <div className="absolute inset-0 pointer-events-none z-10">
-        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 pointer-events-auto z-30">
+      <div className="absolute inset-0 pointer-events-none z-10 bg-transparent">
+        <div className="absolute top-5 right-5 pointer-events-auto z-30 bg-transparent">
           <Scoreboard gameState={gameState} />
         </div>
-
-        <div className="absolute bottom-6 sm:bottom-10 left-1/2 transform -translate-x-1/2 pointer-events-auto w-full px-4 sm:px-0 max-w-7xl z-30">
-          <AnimatePresence mode="wait">
-            {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
-              <motion.div
-                key="shot"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -50 }}
-              >
-                <ShotSelection gameState={gameState} />
-              </motion.div>
-            )}
-            {gameState.state === GameStateEnum.WAITING_FOR_DEFENSE && gameState.room_id && (
-              <motion.div
-                key="defense"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -50 }}
-              >
-                <DefenseSelection gameState={gameState} />
-              </motion.div>
-            )}
-            {gameState.state === GameStateEnum.WAITING_FOR_POWER && gameState.room_id && (
-              <motion.div
-                key="power"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-              >
-                <PowerMeter gameState={gameState} />
-              </motion.div>
-            )}
-            {gameState.state === GameStateEnum.ANIMATING && (
-              <motion.div
-                key="animating"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="pointer-events-none"
-              >
-                <Card variant="strong" className="text-center w-full max-w-sm mx-auto sm:min-w-[400px] bg-black/40 backdrop-blur-sm">
-                  <div className="space-y-6">
-                    <motion.h2
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-3xl font-display text-white text-shadow-lg"
-                    >
-                      Shooting...
-                    </motion.h2>
-                    <motion.p
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                      className="text-white/70 text-lg"
-                    >
-                      Watch the ball!
-                    </motion.p>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-            {gameState.state === GameStateEnum.SHOT_RESULT && gameState.shot_result !== null && (
-              <motion.div
-                key="result"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-              >
-                <Card variant="strong" className="text-center w-full max-w-sm mx-auto sm:min-w-[400px]">
-                  <motion.div
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                    className="mb-6"
-                  >
-                    {gameState.shot_result ? (
-                      <CheckCircle2 className="w-20 h-20 text-success-400 mx-auto glow-green" />
-                    ) : (
-                      <XCircle className="w-20 h-20 text-error-400 mx-auto glow-red" />
-                    )}
-                  </motion.div>
-                  <motion.h2
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`text-5xl font-display mb-4 text-shadow-lg ${
-                      gameState.shot_result ? 'text-success-400' : 'text-error-400'
-                    }`}
-                  >
-                    {gameState.shot_result ? 'Made!' : 'Missed!'}
-                  </motion.h2>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <Button
-                      variant={gameState.shot_result ? 'success' : 'error'}
-                      size="lg"
-                      icon={<RefreshCw className="w-5 h-5" />}
-                      onClick={handleNextTurn}
-                      isLoading={actionLoading === 'nextTurn'}
-                      className="mt-6 min-w-[180px]"
-                    >
-                      Next Turn
-                    </Button>
-                  </motion.div>
-                </Card>
-              </motion.div>
-            )}
-            {gameState.state === GameStateEnum.GAME_OVER && gameState.winner && (
-              <motion.div
-                key="gameover"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-              >
-                <Card variant="strong" className="text-center w-full max-w-md mx-auto sm:min-w-[450px]">
-                  <motion.div
-                    initial={{ rotate: -10, scale: 0 }}
-                    animate={{ rotate: [0, 10, -10, 0], scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                    className="mb-6"
-                  >
-                    <Trophy className="w-24 h-24 text-primary-400 mx-auto glow-orange" />
-                  </motion.div>
-                  <motion.h2
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-5xl font-display text-primary-400 mb-4 text-shadow-lg"
-                  >
-                    {gameState.winner.name} Wins!
-                  </motion.h2>
-                  <div className="space-y-2">
-                    <p className="text-xl text-white/70">Final Score</p>
-                    <motion.p
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.2, type: 'spring' }}
-                      className="text-5xl font-bold text-white text-shadow-lg"
-                    >
-                      {gameState.winner.score}
-                    </motion.p>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </div>
+
+      {/* Controls: LEFT panel, no bottom bar */}
+      <AnimatePresence mode="wait">
+        {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
+          <LeftControlPanel
+            key="shot"
+            title={String(gameState.current_offensive_player ?? 'Player')}
+            subtitle="Choose your shot"
+          >
+            <ShotSelection gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.WAITING_FOR_DEFENSE && gameState.room_id && (
+          <LeftControlPanel
+            key="defense"
+            title={String(gameState.current_defensive_player ?? 'Player')}
+            subtitle="Choose your defense"
+          >
+            <DefenseSelection gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.WAITING_FOR_POWER && gameState.room_id && (
+          <LeftControlPanel
+            key="power"
+            title={String(gameState.current_offensive_player ?? 'Player')}
+            subtitle="Select power"
+          >
+            <PowerMeter gameState={gameState} />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.ANIMATING && (
+          <LeftControlPanel key="animating" title="Shooting..." subtitle="Watch the ball!">
+            <div />
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.SHOT_RESULT && gameState.shot_result !== null && (
+          <LeftControlPanel
+            key="result"
+            title={gameState.shot_result ? 'Made!' : 'Missed!'}
+            subtitle={gameState.shot_result ? 'Great shot!' : 'Better luck next time'}
+          >
+            <button
+              onClick={handleNextTurn}
+              disabled={actionLoading === 'nextTurn'}
+              className="w-full py-4 px-6 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-semibold text-lg shadow-2xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading === 'nextTurn' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  <span>Next Turn</span>
+                </>
+              )}
+            </button>
+          </LeftControlPanel>
+        )}
+        {gameState.state === GameStateEnum.GAME_OVER && gameState.winner && (
+          <motion.div
+            key="gameover"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-auto"
+          >
+            <Card variant="strong" className="text-center w-full max-w-md mx-auto sm:min-w-[450px]">
+              <motion.div
+                initial={{ rotate: -10, scale: 0 }}
+                animate={{ rotate: [0, 10, -10, 0], scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                className="mb-6"
+              >
+                <Trophy className="w-24 h-24 text-primary-400 mx-auto glow-orange" />
+              </motion.div>
+              <motion.h2
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-5xl font-display text-primary-400 mb-4 text-shadow-lg"
+              >
+                {gameState.winner.name} Wins!
+              </motion.h2>
+              <div className="space-y-2">
+                <p className="text-xl text-white/70">Final Score</p>
+                <motion.p
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: 'spring' }}
+                  className="text-5xl font-bold text-white text-shadow-lg"
+                >
+                  {gameState.winner.score}
+                </motion.p>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }
