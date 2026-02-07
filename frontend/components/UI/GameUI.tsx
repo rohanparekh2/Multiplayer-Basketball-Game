@@ -7,6 +7,7 @@ import { DefenseSelection } from './DefenseSelection'
 import { PowerMeter } from './PowerMeter'
 import { Scoreboard } from './Scoreboard'
 import { LeftControlPanel } from './LeftControlPanel'
+import { CoachPanel } from './CoachPanel'
 import { Button } from './Button'
 import { Card } from './Card'
 import { LoadingSpinner } from './LoadingSpinner'
@@ -206,10 +207,21 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
     return <LoadingScreen />
   }
 
-  // Right mode: Only scoreboard
+  // Right mode: Scoreboard + CoachPanel
   if (mode === 'right') {
     if (!gameState) return null
-    return <Scoreboard gameState={gameState} />
+    return (
+      <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+        <div className="flex-shrink-0">
+          <Scoreboard gameState={gameState} />
+        </div>
+        {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
+          <div className="flex-shrink-0">
+            <CoachPanel gameState={gameState} />
+          </div>
+        )}
+      </div>
+    )
   }
 
   // Left mode: Only controls (no BottomControlBar, no scoreboard)
@@ -317,13 +329,18 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
       {/* Controls: LEFT panel, no bottom bar */}
       <AnimatePresence mode="wait">
         {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
-          <LeftControlPanel
-            key="shot"
-            title={String(gameState.current_offensive_player ?? 'Player')}
-            subtitle="Choose your shot"
-          >
-            <ShotSelection gameState={gameState} />
-          </LeftControlPanel>
+          <>
+            <div className="fixed left-5 top-5 z-40 pointer-events-auto flex flex-col gap-4 w-[320px] max-w-[85vw] max-h-[90vh] overflow-y-auto">
+              <LeftControlPanel
+                key="shot"
+                title={String(gameState.current_offensive_player ?? 'Player')}
+                subtitle="Choose your shot"
+              >
+                <ShotSelection gameState={gameState} />
+              </LeftControlPanel>
+              <CoachPanel gameState={gameState} />
+            </div>
+          </>
         )}
         {gameState.state === GameStateEnum.WAITING_FOR_DEFENSE && gameState.room_id && (
           <LeftControlPanel

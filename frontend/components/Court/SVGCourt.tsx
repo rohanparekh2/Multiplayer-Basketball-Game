@@ -66,6 +66,8 @@ export function SVGCourt({ debug = false }: SVGCourtProps) {
     <div 
       ref={containerRef} 
       className="relative w-full h-full flex items-center justify-center"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
     >
       {/* #region agent log */}
       {typeof window !== 'undefined' && (() => {

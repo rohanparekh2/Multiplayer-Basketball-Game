@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 from app.models.player import Player
 from app.models.offense import ShotType
 from app.models.defense import DefenseType
+from app.models.shot_record import ShotRecord
+from app.models.defense_state import DefenseState
 
 
 class GameState(str, Enum):
@@ -30,6 +32,8 @@ class Game:
     shot_result: Optional[bool] = None
     animation_finished: bool = False
     room_id: str = ""
+    shot_history: List[ShotRecord] = field(default_factory=list)  # Last 10-20 shots across both players
+    defense_state: Optional[DefenseState] = None
     
     def __post_init__(self):
         """Initialize current players."""

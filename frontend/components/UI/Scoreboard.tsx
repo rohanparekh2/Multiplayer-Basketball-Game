@@ -3,6 +3,8 @@
 import { GameStateResponse } from '@/types/game'
 import { Trophy, User } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { PlayerStats } from './PlayerStats'
+import { DefenseStateDisplay } from './DefenseStateDisplay'
 
 interface ScoreboardProps {
   gameState: GameStateResponse
@@ -13,7 +15,7 @@ export function Scoreboard({ gameState }: ScoreboardProps) {
   const isPlayerTwoActive = gameState.current_offensive_player === gameState.player_two.name
 
   return (
-    <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl shadow-2xl p-6 w-full max-w-[220px] max-h-[85vh] overflow-y-auto">
+    <div className="bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl shadow-2xl p-4 w-full max-w-[220px]">
       <div className="space-y-3">
         <div className="flex items-center justify-center gap-1.5 pb-2 border-b border-white/20">
           <Trophy className="w-4 h-4 text-orange-600" />
@@ -95,6 +97,19 @@ export function Scoreboard({ gameState }: ScoreboardProps) {
             </div>
           </motion.div>
         </div>
+        
+        {/* Player Stats */}
+        <div className="pt-3 border-t border-white/20 space-y-2">
+          <PlayerStats gameState={gameState} isPlayerOne={true} />
+          <PlayerStats gameState={gameState} isPlayerOne={false} />
+        </div>
+        
+        {/* Defense State */}
+        {gameState.defense_state && (
+          <div className="pt-3 border-t border-white/20">
+            <DefenseStateDisplay defenseState={gameState.defense_state} />
+          </div>
+        )}
       </div>
     </div>
   )

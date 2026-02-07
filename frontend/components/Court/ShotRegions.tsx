@@ -27,8 +27,14 @@ export function ShotRegions({ debug = false }: ShotRegionsProps) {
     }
   }
   
+  // DISABLED: User wants only buttons to be clickable, not court regions
+  // Always return null unless in debug mode
+  if (!debug) {
+    return null
+  }
+  
   // Don't render if not in shot selection state (unless debug mode)
-  if (!debug && !isShotSelectionActive) {
+  if (!isShotSelectionActive) {
     return null
   }
   
@@ -46,43 +52,85 @@ export function ShotRegions({ debug = false }: ShotRegionsProps) {
       {/* Paint/Key area - Layup */}
       <div
         className={`absolute left-[25%] right-[25%] top-[12%] bottom-[42%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.LAYUP)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.LAYUP)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* Restricted area (semicircle under rim) - Layup */}
       <div
         className={`absolute left-[38%] right-[38%] bottom-[40%] h-[12%] rounded-full ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.LAYUP)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.LAYUP)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* Midrange region (between paint and 3pt arc) */}
       <div
         className={`absolute left-[14%] right-[14%] top-[12%] bottom-[30%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.MIDRANGE)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.MIDRANGE)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* 3pt arc region (outside paint, inside corner 3s) */}
       <div
         className={`absolute left-[14%] right-[14%] top-[30%] bottom-[0%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.THREE_POINTER)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.THREE_POINTER)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* Corner 3 left */}
       <div
         className={`absolute left-0 w-[14%] bottom-0 h-[70%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.THREE_POINTER)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.THREE_POINTER)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* Corner 3 right */}
       <div
         className={`absolute right-0 w-[14%] bottom-0 h-[70%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.THREE_POINTER)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.THREE_POINTER)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
       
       {/* Half-court region (top area beyond 3pt) */}
       <div
         className={`absolute left-[14%] right-[14%] top-0 bottom-[70%] ${zoneStyle} ${pointerStyle}`}
-        onClick={() => handleRegionClick(ShotType.HALF_COURT)}
+        onClick={(e) => {
+          e.stopPropagation()
+          if (isShotSelectionActive && !isLoading) {
+            handleRegionClick(ShotType.HALF_COURT)
+          }
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
       />
     </>
   )

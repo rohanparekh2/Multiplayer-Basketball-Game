@@ -16,7 +16,7 @@ export default function Home() {
     <ErrorBoundary>
       <DebugProvider>
         <main 
-          className="h-screen w-screen grid grid-cols-[320px_1fr_320px]"
+          className="h-screen w-screen grid grid-cols-[320px_1fr_320px] overflow-hidden"
           role="main"
           style={{
             backgroundImage: "url(/wood.png)",
@@ -25,7 +25,7 @@ export default function Home() {
           }}
         >
           {/* Left column - Game UI */}
-          <div className="flex items-center justify-center p-6">
+          <div className="flex items-center justify-center p-4 overflow-hidden">
             <ErrorBoundary>
               <GameUI mode="left" />
             </ErrorBoundary>
@@ -46,7 +46,7 @@ export default function Home() {
           </div>
 
           {/* Right column - Scoreboard */}
-          <div className="flex items-start justify-center p-6">
+          <div className="flex items-start justify-center p-4 overflow-hidden">
             <GameUI mode="right" />
           </div>
         </main>

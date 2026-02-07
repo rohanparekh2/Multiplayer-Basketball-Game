@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.models.offense import ShotType
 from app.models.defense import DefenseType
+from app.models.shot_archetypes import ShotArchetype, ShotZone, ContestLevel, DribbleState
 
 
 class PlayerSchema(BaseModel):
@@ -20,8 +21,15 @@ class GameCreate(BaseModel):
 
 
 class ShotRequest(BaseModel):
-    """Schema for shot selection."""
-    shot_type: ShotType
+    """Schema for shot selection. Supports both legacy and new formats."""
+    # Legacy format (backward compatible)
+    shot_type: Optional[ShotType] = None
+    # New format
+    archetype: Optional[ShotArchetype] = None
+    subtype: Optional[str] = None  # If None, use default for archetype
+    zone: Optional[ShotZone] = None
+    contest_level: Optional[ContestLevel] = None  # Auto-set by defense if None
+    dribble_state: Optional[DribbleState] = None
 
 
 class DefenseRequest(BaseModel):
@@ -32,6 +40,30 @@ class DefenseRequest(BaseModel):
 class PowerRequest(BaseModel):
     """Schema for power selection."""
     power: int
+
+
+class ShotRecordSchema(BaseModel):
+    """Schema for shot record."""
+    archetype: str
+    subtype: str
+    zone: str
+    contest_level: str
+    made: bool
+    points: int
+    turn_number: int
+    
+    class Config:
+        from_attributes = True
+
+
+class DefenseStateSchema(BaseModel):
+    """Schema for defense state."""
+    contest_distribution: dict[str, str] = {}
+    help_frequency: float = 0.5
+    foul_rate: float = 0.1
+    
+    class Config:
+        from_attributes = True
 
 
 class GameStateResponse(BaseModel):
@@ -49,6 +81,8 @@ class GameStateResponse(BaseModel):
     animation_finished: bool
     game_over: bool
     winner: Optional[PlayerSchema] = None
+    shot_history: list[ShotRecordSchema] = []
+    defense_state: Optional[DefenseStateSchema] = None
 
 
 class GameResponse(BaseModel):

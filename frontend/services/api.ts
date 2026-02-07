@@ -119,5 +119,16 @@ export const gameApi = {
     const response = await api.post(`/api/game/${roomId}/next-turn`)
     return response.data
   },
+
+  getCoachAdvice: async (roomId: string): Promise<{
+    recommended_shot: { archetype: string; subtype: string; zone: string }
+    advice_text: string
+    reasoning: string
+    expected_points: number
+    challenge?: string
+  }> => {
+    const response = await api.get(`/api/game/${roomId}/coach-advice`)
+    return response.data
+  },
 }
 

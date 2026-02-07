@@ -183,7 +183,11 @@ export function GameCanvas() {
   // #endregion
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center">
+    <div 
+      className="relative w-full h-full flex items-center justify-center"
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {/* #region agent log */}
       {typeof window !== 'undefined' && (() => {
         fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GameCanvas.tsx:177',message:'GameCanvas render',data:{viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,hasGameState:!!gameState},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
@@ -191,7 +195,11 @@ export function GameCanvas() {
       })()}
       {/* #endregion */}
       {/* Court image */}
-      <div className="relative w-full h-full">
+      <div 
+        className="relative w-full h-full"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <SVGCourt debug={debug} />
         
         {/* Render ball or animation based on state */}
