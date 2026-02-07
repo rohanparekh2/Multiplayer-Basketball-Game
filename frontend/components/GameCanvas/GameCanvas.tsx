@@ -6,6 +6,7 @@ import { gameApi } from '@/services/api'
 import { SVGCourt } from '../Court/SVGCourt'
 import { SVGBasketball } from '../Basketball/SVGBasketball'
 import { SVGBallAnimation } from '../Basketball/SVGBallAnimation'
+import { ZoneHeatOverlay } from '../Court/ZoneHeatOverlay'
 import { ANCHORS } from '../Court/courtConstants'
 
 export function GameCanvas() {
@@ -219,6 +220,9 @@ export function GameCanvas() {
         onMouseDown={(e) => e.stopPropagation()}
       >
         <SVGCourt debug={debug} />
+        
+        {/* Zone Heat Overlay */}
+        <ZoneHeatOverlay defenseState={gameState?.defense_state} />
         
         {/* Render ball or animation based on state */}
         {/* Note: When using TimingMeter, ShotResolutionAnimation is shown in TimingMeterWrapper instead */}

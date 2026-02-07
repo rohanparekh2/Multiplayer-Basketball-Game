@@ -6,6 +6,9 @@ export class WebSocketClient {
   private onMessageCallback: ((data: GameStateResponse) => void) | null = null
   private isReconnecting: boolean = false
   private reconnectAttempts: number = 0
+  private maxReconnectAttempts: number = 5
+  private reconnectTimeout: NodeJS.Timeout | null = null
+  private shouldReconnect: boolean = true
 
   constructor(roomId: string) {
     this.roomId = roomId
@@ -49,7 +52,10 @@ export class WebSocketClient {
       }
 
       this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
+        // Don't log errors during reconnection attempts - they're expected
+        if (!this.isReconnecting) {
+          console.error('WebSocket error:', error)
+        }
         if (!resolved) {
           resolved = true
           clearTimeout(timeout)
@@ -59,21 +65,53 @@ export class WebSocketClient {
 
       this.ws.onclose = (event) => {
         console.log('WebSocket disconnected', event.code, event.reason)
-        // Attempt reconnection if not a normal closure
-        if (event.code !== 1000 && this.onMessageCallback) {
+        
+        // Clear any existing reconnect timeout
+        if (this.reconnectTimeout) {
+          clearTimeout(this.reconnectTimeout)
+          this.reconnectTimeout = null
+        }
+        
+        // Reset if normal closure or manual disconnect
+        if (event.code === 1000 || !this.shouldReconnect) {
+          this.isReconnecting = false
+          this.reconnectAttempts = 0
+          return
+        }
+        
+        // Check if we've exceeded max attempts
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+          console.warn(`⚠️ WebSocket: Max reconnection attempts (${this.maxReconnectAttempts}) reached. Stopping reconnection. Game will use polling for updates.`)
+          this.isReconnecting = false
+          this.reconnectAttempts = 0
+          // Notify callback that connection is permanently lost (if callback supports it)
+          // This allows the game to fall back to polling more aggressively
+          return
+        }
+        
+        // Attempt reconnection if callback exists
+        if (this.onMessageCallback) {
           this.isReconnecting = true
           this.reconnectAttempts++
-          console.log(`Attempting to reconnect... (attempt ${this.reconnectAttempts})`)
-          const delay = Math.min(3000 * this.reconnectAttempts, 10000) // Exponential backoff, max 10s
-          setTimeout(() => {
+          const delay = Math.min(1000 + (this.reconnectAttempts * 1000), 5000) // 1s, 2s, 3s, 4s, 5s max
+          console.log(`Attempting to reconnect... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}, delay: ${delay}ms)`)
+          
+          this.reconnectTimeout = setTimeout(() => {
+            this.reconnectTimeout = null
             this.connect()
               .then(() => {
+                console.log('✅ WebSocket reconnected successfully')
                 this.isReconnecting = false
                 this.reconnectAttempts = 0
               })
               .catch((error) => {
-                console.error('Reconnection failed:', error)
-                // Will retry on next close event
+                // Silently handle reconnection errors - don't spam console
+                // The onclose handler will be called again if connection fails
+                // and will retry up to max attempts
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                  // Only log if we haven't hit max attempts yet
+                  console.warn(`⚠️ WebSocket reconnection attempt ${this.reconnectAttempts} failed, will retry...`)
+                }
               })
           }, delay)
         } else {
@@ -95,9 +133,24 @@ export class WebSocketClient {
   }
 
   disconnect() {
+    this.shouldReconnect = false
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout)
+      this.reconnectTimeout = null
+    }
     if (this.ws) {
-      this.ws.close()
+      this.ws.close(1000, 'Manual disconnect')
       this.ws = null
+    }
+    this.isReconnecting = false
+    this.reconnectAttempts = 0
+  }
+  
+  getReconnectStatus(): { isReconnecting: boolean; attempts: number; maxAttempts: number } {
+    return {
+      isReconnecting: this.isReconnecting,
+      attempts: this.reconnectAttempts,
+      maxAttempts: this.maxReconnectAttempts
     }
   }
 }

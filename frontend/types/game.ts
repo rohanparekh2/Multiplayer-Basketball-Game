@@ -68,6 +68,11 @@ export interface DefenseState {
   contest_distribution: Record<string, string>
   help_frequency: number
   foul_rate: number
+  summary?: {
+    perimeter_pressure?: number
+    rim_protection?: number
+    scheme?: string
+  }
 }
 
 export interface GameStateResponse {

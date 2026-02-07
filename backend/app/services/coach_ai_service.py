@@ -50,10 +50,11 @@ Return JSON: {"recommended_shot": {"archetype": "...", "subtype": "...", "zone":
         
         if self._use_llm:
             try:
-                from openai import OpenAI
-                self.client = OpenAI(api_key=api_key)
+                import google.generativeai as genai
+                genai.configure(api_key=api_key)
+                self.client = genai.GenerativeModel('gemini-pro')
             except ImportError:
-                print("Warning: OpenAI not installed. Coach will use rule-based fallback.")
+                print("Warning: google-generativeai not installed. Coach will use rule-based fallback.")
                 self._use_llm = False
     
     def _compute_state_hash(self, game_state: Dict) -> str:
@@ -192,17 +193,29 @@ Shot History (last 10):
         if self._use_llm:
             try:
                 prompt = self._build_prompt(game_state)
-                response = self.client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": self.COACH_SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.7,
+                # Combine system prompt and user prompt for Gemini
+                full_prompt = f"{self.COACH_SYSTEM_PROMPT}\n\n{prompt}\n\nReturn your response as valid JSON only."
+                
+                import google.generativeai as genai
+                response = self.client.generate_content(
+                    full_prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                    )
                 )
                 
-                advice_dict = json.loads(response.choices[0].message.content)
+                # Extract JSON from response (Gemini may wrap it in markdown code blocks)
+                response_text = response.text.strip()
+                # Remove markdown code blocks if present
+                if response_text.startswith("```json"):
+                    response_text = response_text[7:]
+                if response_text.startswith("```"):
+                    response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+                
+                advice_dict = json.loads(response_text)
                 
                 # Calculate expected_points
                 expected_points = self._calculate_expected_points(
@@ -251,7 +264,7 @@ def get_coach_service() -> CoachAIService:
     global coach_ai_service
     if coach_ai_service is None:
         import os
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY")
         coach_ai_service = CoachAIService(api_key=api_key)
     return coach_ai_service
 

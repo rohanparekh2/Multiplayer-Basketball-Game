@@ -5,6 +5,10 @@ import { Trophy, User } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { PlayerStats } from './PlayerStats'
 import { DefenseStateDisplay } from './DefenseStateDisplay'
+import { ScoutingReport } from './ScoutingReport'
+import { HotColdIndicator } from './HotColdIndicator'
+import { FatigueBar } from './FatigueBar'
+import { ShotChart } from './ShotChart'
 
 interface ScoreboardProps {
   gameState: GameStateResponse
@@ -98,11 +102,27 @@ export function Scoreboard({ gameState }: ScoreboardProps) {
           </motion.div>
         </div>
         
+        {/* Player Stats - Only show for current offensive player */}
+        {gameState.current_offensive_player && (
+          <div className="pt-3 border-t border-white/20 space-y-2">
+            <HotColdIndicator gameState={gameState} />
+            <FatigueBar gameState={gameState} />
+            <ShotChart gameState={gameState} />
+          </div>
+        )}
+        
         {/* Player Stats */}
         <div className="pt-3 border-t border-white/20 space-y-2">
           <PlayerStats gameState={gameState} isPlayerOne={true} />
           <PlayerStats gameState={gameState} isPlayerOne={false} />
         </div>
+        
+        {/* Scouting Report */}
+        {gameState.defense_state && (
+          <div className="pt-3 border-t border-white/20">
+            <ScoutingReport gameState={gameState} />
+          </div>
+        )}
         
         {/* Defense State */}
         {gameState.defense_state && (

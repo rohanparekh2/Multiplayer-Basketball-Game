@@ -71,8 +71,8 @@ export function SVGBallAnimation({
         initial={{ cx: start.x, cy: start.y, scale: 1, rotate: 0 }}
         animate={anim}
         transition={{
-          duration: made ? 1.4 : 1.8, // Made is faster, miss is slower
-          times: made ? [0, 0.4, 0.65, 0.85, 1] : [0, 0.45, 0.6, 0.8, 1],
+          duration: made ? 2.5 : 2.8, // Longer duration so make % display is visible longer
+          times: made ? [0, 0.35, 0.6, 0.8, 1] : [0, 0.4, 0.55, 0.75, 1],
           ease: made ? [0.4, 0, 0.2, 1] : [0.5, 0, 0.3, 1], // Smoother for made, more abrupt for miss
         }}
         onAnimationComplete={onComplete}
@@ -87,21 +87,21 @@ export function SVGBallAnimation({
           fill="rgba(34, 197, 94, 0.2)"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: [0.8, 1.2, 1.4], opacity: [0, 0.5, 0] }}
-          transition={{ duration: 0.4, delay: 0.65 }}
+          transition={{ duration: 0.5, delay: 1.5 }} // Adjusted delay for longer animation
         />
       )}
 
       {/* Miss effect - rim shake and red flash */}
       {!made && (
         <>
-          <motion.g
+      <motion.g
             animate={{
               x: [0, -4, 4, -3, 3, -2, 2, 0],
               y: [0, -2, 2, -1, 1, 0],
             }}
             transition={{
-              delay: 0.6,
-              duration: 0.5,
+              delay: 1.4, // Adjusted delay for longer animation
+              duration: 0.6,
               ease: 'easeInOut',
             }}
           >
@@ -112,8 +112,8 @@ export function SVGBallAnimation({
               fill="none"
               stroke="rgba(239, 68, 68, 0.5)"
               strokeWidth="3"
-            />
-          </motion.g>
+        />
+      </motion.g>
           <motion.circle
             cx={rim.x}
             cy={rim.y}
@@ -121,7 +121,7 @@ export function SVGBallAnimation({
             fill="rgba(239, 68, 68, 0.25)"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: [0.8, 1.3, 1.5], opacity: [0, 0.5, 0] }}
-            transition={{ delay: 0.6, duration: 0.5 }}
+            transition={{ delay: 1.4, duration: 0.6 }} // Adjusted delay for longer animation
           />
         </>
       )}
@@ -169,15 +169,15 @@ export function SVGBallAnimation({
 
           {/* Apex (blue circle) */}
           <circle
-            cx={apex.x}
-            cy={apex.y}
+            cx={made ? madeApex.x : missApex.x}
+            cy={made ? madeApex.y : missApex.y}
             r="6"
             fill="blue"
             opacity="0.7"
           />
           <text
-            x={apex.x}
-            y={apex.y - 15}
+            x={made ? madeApex.x : missApex.x}
+            y={(made ? madeApex.y : missApex.y) - 15}
             fill="blue"
             fontSize="10"
             textAnchor="middle"

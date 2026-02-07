@@ -1,7 +1,11 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 from app.api import game
 from app.websocket import game_handler
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = FastAPI(
     title="Basketball Game API",

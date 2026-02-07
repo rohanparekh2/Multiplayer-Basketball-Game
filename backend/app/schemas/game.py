@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 from app.models.offense import ShotType
 from app.models.defense import DefenseType
 from app.models.shot_archetypes import ShotArchetype, ShotZone, ContestLevel, DribbleState
@@ -64,6 +64,7 @@ class DefenseStateSchema(BaseModel):
     contest_distribution: dict[str, str] = {}
     help_frequency: float = 0.5
     foul_rate: float = 0.1
+    summary: Optional[dict[str, Any]] = None  # {perimeter_pressure: float, rim_protection: float, scheme: str}
     
     class Config:
         from_attributes = True

@@ -31,7 +31,7 @@ const SHOT_TO_SUBTYPE: Record<ShotType, string> = {
 }
 
 export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
-  const { selectPower, actionLoading } = useGameState()
+  const { selectPower, actionLoading, refreshGameState } = useGameState()
   const [timingResult, setTimingResult] = useState<TimingResult | null>(null)
   const [shotMade, setShotMade] = useState(false)
   const [finalProbability, setFinalProbability] = useState(0)
@@ -77,27 +77,22 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
       // Ensure power value is in valid range (0-100)
       const clampedPower = Math.max(0, Math.min(100, powerValue))
       
-      // Call API directly to get backend's calculated result (includes timing)
-      // Only call once to avoid state conflicts
-      const apiResponse = await gameApi.selectPower(
-        gameState.room_id,
+      // Use the hook's selectPower function which properly updates game state
+      // This will trigger the state transition to 'animating' and start the animation
+      const success = await selectPower(
         clampedPower,
+        gameState.room_id,
         result.grade,  // Send timing grade
         result.error   // Send timing error
       )
 
-      // Use backend's calculated result (it now includes timing!)
-      if (apiResponse?.game_state?.shot_result !== null && apiResponse?.game_state?.shot_result !== undefined) {
-        const backendMade = apiResponse.game_state.shot_result
-        setShotMade(backendMade)
-        console.log('🏀 Backend shot result (with timing):', backendMade)
-      } else {
-        // Fallback: use frontend calculation if backend doesn't return result
-        const random = Math.random()
-        const made = random < finalPct
-        setShotMade(made)
-        console.log('🏀 Using frontend calculation (backend result not available):', made)
+      if (!success) {
+        throw new Error('Failed to select power')
       }
+      
+      console.log('✅ selectPower completed, state should transition to animating')
+      // The selectPower function already updates the game state from the API response
+      // The animation will trigger automatically when gameState.state becomes 'animating'
 
       setIsProcessing(false)
     } catch (error: any) {
@@ -108,6 +103,14 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
     }
   }
 
+
+  // Update shotMade when game state transitions to animating
+  useEffect(() => {
+    if (timingResult && gameState?.state === 'animating' && gameState?.shot_result !== null && gameState?.shot_result !== undefined) {
+      setShotMade(gameState.shot_result)
+      console.log('🏀 Shot result from game state:', gameState.shot_result)
+    }
+  }, [timingResult, gameState?.state, gameState?.shot_result])
 
   // Call finishAnimation after court animation completes
   // This transitions backend from ANIMATING to SHOT_RESULT
@@ -121,7 +124,7 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
         } catch (error: any) {
           console.error('❌ Error calling finishAnimation:', error)
         }
-      }, 1800) // Wait for court animation to complete
+      }, 2800) // Wait for court animation to complete (matches longer animation duration)
       return () => clearTimeout(timeout)
     }
   }, [timingResult, gameState?.room_id, gameState?.state])

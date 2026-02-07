@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
 from enum import Enum
 from app.models.shot_archetypes import ShotZone, ContestLevel
 
@@ -27,4 +27,7 @@ class DefenseState:
     
     # Optional personality/scheme
     personality: Optional[DefensePersonality] = None  # DROP_BIG, SWITCH_EVERYTHING, etc.
+    
+    # Summary for UI (calculated by DefenseAIService)
+    summary: Optional[Dict[str, Any]] = field(default=None)  # {perimeter_pressure: float, rim_protection: float, scheme: str}
 

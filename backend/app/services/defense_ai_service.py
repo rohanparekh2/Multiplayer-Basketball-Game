@@ -33,7 +33,7 @@ class DefenseAIService:
         # Adjust defense - PRIMARY: contest_distribution
         if three_rate > 0.5:
             # User spams three-pointers - pressure perimeter
-            return DefenseState(
+            defense_state = DefenseState(
                 contest_distribution={
                     ShotZone.CORNER: ContestLevel.HEAVY,
                     ShotZone.WING: ContestLevel.HEAVY,
@@ -46,9 +46,11 @@ class DefenseAIService:
                 foul_rate=0.1,
                 personality=DefensePersonality.SWITCH_EVERYTHING,
             )
+            defense_state.summary = self._calculate_summary(defense_state)
+            return defense_state
         elif rim_rate > 0.5 or paint_rate > 0.4:
             # User spams rim/paint - collapse inside
-            return DefenseState(
+            defense_state = DefenseState(
                 contest_distribution={
                     ShotZone.CORNER: ContestLevel.LIGHT,
                     ShotZone.WING: ContestLevel.LIGHT,
@@ -61,9 +63,11 @@ class DefenseAIService:
                 foul_rate=0.2,  # Higher foul rate at rim
                 personality=DefensePersonality.DROP_BIG,
             )
+            defense_state.summary = self._calculate_summary(defense_state)
+            return defense_state
         elif midrange_rate > 0.4:
             # User prefers midrange - no middle defense
-            return DefenseState(
+            defense_state = DefenseState(
                 contest_distribution={
                     ShotZone.CORNER: ContestLevel.LIGHT,
                     ShotZone.WING: ContestLevel.HEAVY,
@@ -76,9 +80,11 @@ class DefenseAIService:
                 foul_rate=0.15,
                 personality=DefensePersonality.NO_MIDDLE,
             )
+            defense_state.summary = self._calculate_summary(defense_state)
+            return defense_state
         else:
             # Balanced approach - dare them to shoot
-            return DefenseState(
+            defense_state = DefenseState(
                 contest_distribution={
                     ShotZone.CORNER: ContestLevel.LIGHT,
                     ShotZone.WING: ContestLevel.LIGHT,
@@ -91,6 +97,8 @@ class DefenseAIService:
                 foul_rate=0.1,
                 personality=DefensePersonality.DARE_YOU_TO_SHOOT,
             )
+            defense_state.summary = self._calculate_summary(defense_state)
+            return defense_state
     
     def _calculate_shot_rate(self, shots: List[ShotRecord], archetype: ShotArchetype) -> float:
         """Calculate the rate of shots of a given archetype."""
@@ -101,7 +109,7 @@ class DefenseAIService:
     
     def _get_default_defense(self) -> DefenseState:
         """Return default balanced defense state."""
-        return DefenseState(
+        defense_state = DefenseState(
             contest_distribution={
                 ShotZone.CORNER: ContestLevel.LIGHT,
                 ShotZone.WING: ContestLevel.LIGHT,
@@ -114,4 +122,45 @@ class DefenseAIService:
             foul_rate=0.1,
             personality=None,
         )
+        defense_state.summary = self._calculate_summary(defense_state)
+        return defense_state
+    
+    def _calculate_summary(self, defense_state: DefenseState) -> dict:
+        """Calculate summary metrics for UI display."""
+        contest_dist = defense_state.contest_distribution
+        
+        # Calculate perimeter pressure (average of CORNER, WING, TOP)
+        perimeter_zones = [ShotZone.CORNER, ShotZone.WING, ShotZone.TOP]
+        perimeter_contests = [contest_dist.get(zone, ContestLevel.LIGHT) for zone in perimeter_zones]
+        perimeter_scores = {
+            ContestLevel.OPEN: 0.0,
+            ContestLevel.LIGHT: 0.33,
+            ContestLevel.HEAVY: 1.0,
+        }
+        perimeter_pressure = sum(perimeter_scores.get(level, 0.0) for level in perimeter_contests) / len(perimeter_zones)
+        
+        # Calculate rim protection (average of PAINT, RESTRICTED)
+        rim_zones = [ShotZone.PAINT, ShotZone.RESTRICTED]
+        rim_contests = [contest_dist.get(zone, ContestLevel.LIGHT) for zone in rim_zones]
+        rim_scores = {
+            ContestLevel.OPEN: 0.0,
+            ContestLevel.LIGHT: 0.33,
+            ContestLevel.HEAVY: 1.0,
+        }
+        rim_protection = sum(rim_scores.get(level, 0.0) for level in rim_contests) / len(rim_zones)
+        
+        # Map personality to scheme string
+        scheme_map = {
+            DefensePersonality.SWITCH_EVERYTHING: "SWITCH",
+            DefensePersonality.DROP_BIG: "DROP",
+            DefensePersonality.NO_MIDDLE: "NO_MIDDLE",
+            DefensePersonality.DARE_YOU_TO_SHOOT: "DARE",
+        }
+        scheme = scheme_map.get(defense_state.personality, "BALANCED")
+        
+        return {
+            "perimeter_pressure": round(perimeter_pressure, 2),
+            "rim_protection": round(rim_protection, 2),
+            "scheme": scheme,
+        }
 

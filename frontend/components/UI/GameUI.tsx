@@ -21,6 +21,10 @@ import { gameApi } from '@/services/api'
 import { GameState as GameStateEnum } from '@/types/game'
 import { Trophy, CheckCircle2, XCircle, RefreshCw, SkipForward } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { calculateMakePct } from '@/utils/offense'
+import { ShotType, ShotArchetype, ShotZone, ContestLevel, GameStateResponse } from '@/types/game'
+import { determineContestLevel } from './TimingMeterExample'
+import { DefenseChangeNotification } from './DefenseChangeNotification'
 
 export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overlay' }) {
   const { gameState, createGame, loading, error, actionLoading, nextTurn, isPolling, wsConnected } = useGameState()
@@ -207,7 +211,7 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
     return <LoadingScreen />
   }
 
-  // Right mode: Scoreboard + CoachPanel
+  // Right mode: Scoreboard only (CoachPanel moved to left side)
   if (mode === 'right') {
     if (!gameState) return null
     return (
@@ -215,11 +219,6 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
         <div className="flex-shrink-0">
           <Scoreboard gameState={gameState} />
         </div>
-        {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
-          <div className="flex-shrink-0">
-            <CoachPanel gameState={gameState} />
-          </div>
-        )}
       </div>
     )
   }
@@ -230,13 +229,21 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
     
     return (
       <>
+        {/* Defense Change Notifications */}
+        <DefenseChangeNotification 
+          gameState={gameState} 
+          onDefenseChange={(message) => showToast(message, 'info')}
+        />
         {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
-          <LeftControlPanel
-            title={String(gameState.current_offensive_player ?? 'Player')}
-            subtitle="Choose your shot"
-          >
-            <ShotSelection gameState={gameState} />
-          </LeftControlPanel>
+          <div className="fixed left-5 top-3 z-40 pointer-events-auto flex flex-col gap-3 w-[260px] max-w-[85vw] max-h-[90vh] overflow-y-auto">
+            <LeftControlPanel
+              title={String(gameState.current_offensive_player ?? 'Player')}
+              subtitle="Choose your shot"
+            >
+              <ShotSelection gameState={gameState} />
+            </LeftControlPanel>
+            <CoachPanel gameState={gameState} />
+          </div>
         )}
         {gameState.state === GameStateEnum.WAITING_FOR_DEFENSE && gameState.room_id && (
           <LeftControlPanel
@@ -256,7 +263,7 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
         )}
         {gameState.state === GameStateEnum.ANIMATING && (
           <LeftControlPanel title="Shooting..." subtitle="Watch the ball!">
-            <div />
+            <ShootingInfo gameState={gameState} />
           </LeftControlPanel>
         )}
         {gameState.state === GameStateEnum.SHOT_RESULT && gameState.shot_result !== null && (
@@ -291,6 +298,12 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
   return (
     <>
       <ToastContainer toasts={toasts} onClose={removeToast} />
+      
+      {/* Defense Change Notifications */}
+      <DefenseChangeNotification 
+        gameState={gameState} 
+        onDefenseChange={(message) => showToast(message, 'info')}
+      />
       
       {/* Debug Panel */}
       <DebugPanel 
@@ -330,7 +343,7 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
       <AnimatePresence mode="wait">
         {gameState.state === GameStateEnum.WAITING_FOR_SHOT && gameState.room_id && (
           <>
-            <div className="fixed left-5 top-5 z-40 pointer-events-auto flex flex-col gap-4 w-[320px] max-w-[85vw] max-h-[90vh] overflow-y-auto">
+            <div className="fixed left-5 top-3 z-40 pointer-events-auto flex flex-col gap-3 w-[260px] max-w-[85vw] max-h-[90vh] overflow-y-auto">
               <LeftControlPanel
                 key="shot"
                 title={String(gameState.current_offensive_player ?? 'Player')}
@@ -362,7 +375,7 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
         )}
         {gameState.state === GameStateEnum.ANIMATING && (
           <LeftControlPanel key="animating" title="Shooting..." subtitle="Watch the ball!">
-            <div />
+            <ShootingInfo gameState={gameState} />
           </LeftControlPanel>
         )}
         {gameState.state === GameStateEnum.SHOT_RESULT && gameState.shot_result !== null && (
@@ -430,6 +443,77 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
         )}
       </AnimatePresence>
     </>
+  )
+}
+
+// Component to show make percentage during animation
+function ShootingInfo({ gameState }: { gameState: GameStateResponse }) {
+  // Map shot type to archetype/subtype (same as TimingMeterWrapper)
+  const SHOT_TO_ARCHETYPE: Record<ShotType, ShotArchetype> = {
+    [ShotType.LAYUP]: ShotArchetype.RIM,
+    [ShotType.MIDRANGE]: ShotArchetype.MIDRANGE,
+    [ShotType.THREE_POINTER]: ShotArchetype.THREE,
+    [ShotType.HALF_COURT]: ShotArchetype.DEEP,
+    [ShotType.DEFAULT]: ShotArchetype.MIDRANGE,
+  }
+
+  const SHOT_TO_SUBTYPE: Record<ShotType, string> = {
+    [ShotType.LAYUP]: 'layup',
+    [ShotType.MIDRANGE]: 'catch_shoot',
+    [ShotType.THREE_POINTER]: 'wing_catch',
+    [ShotType.HALF_COURT]: 'logo',
+    [ShotType.DEFAULT]: 'catch_shoot',
+  }
+
+  let makePct = 0.5 // Default fallback
+
+  try {
+    // First, try to use power value if available (this should be the calculated make percentage)
+    if (gameState.power !== null && gameState.power !== undefined) {
+      makePct = gameState.power / 100
+    } else if (gameState.shot_type && gameState.defense_state) {
+      // Fallback: calculate from shot type and defense
+      const archetype = SHOT_TO_ARCHETYPE[gameState.shot_type]
+      const subtype = SHOT_TO_SUBTYPE[gameState.shot_type]
+      const zone = ShotZone.WING // Default zone
+      const contestLevel = determineContestLevel(gameState.defense_state)
+      const shotHistory = gameState.shot_history || []
+
+      // Calculate make percentage (without exact timing since we don't have that data here)
+      // Use a default "GOOD" timing grade as approximation
+      makePct = calculateMakePct({
+        archetype,
+        subtype,
+        zone,
+        contestLevel,
+        timingGrade: 'GOOD', // Default approximation
+        timingError: 0.3, // Default approximation
+        shotHistory,
+      })
+    }
+  } catch (error) {
+    console.error('Error calculating make percentage:', error)
+    // Use default value
+  }
+
+  console.log('ShootingInfo render:', { 
+    shot_type: gameState.shot_type, 
+    defense_state: gameState.defense_state,
+    power: gameState.power,
+    makePct,
+    hasPower: gameState.power !== null && gameState.power !== undefined
+  })
+
+  // Always render, even if we have to use a default value
+  return (
+    <div className="w-full text-center py-4">
+      <div className="inline-block px-6 py-3 bg-black/40 backdrop-blur-sm rounded-xl border-2 border-white/30 shadow-lg">
+        <div className="text-sm text-white/90 mb-1">Make Percentage</div>
+        <div className="text-3xl font-bold text-white">
+          {(makePct * 100).toFixed(1)}%
+        </div>
+      </div>
+    </div>
   )
 }
 
