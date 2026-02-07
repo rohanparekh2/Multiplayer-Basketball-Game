@@ -103,9 +103,16 @@ export const gameApi = {
     return response.data
   },
 
-  selectPower: async (roomId: string, power: number): Promise<{ message: string; game_state: GameStateResponse }> => {
+  selectPower: async (
+    roomId: string, 
+    power: number,
+    timingGrade?: string,
+    timingError?: number
+  ): Promise<{ message: string; game_state: GameStateResponse }> => {
     const response = await api.post(`/api/game/${roomId}/power`, {
       power,
+      timing_grade: timingGrade,
+      timing_error: timingError,
     })
     return response.data
   },

@@ -38,8 +38,11 @@ class DefenseRequest(BaseModel):
 
 
 class PowerRequest(BaseModel):
-    """Schema for power selection."""
+    """Schema for power selection. Now supports timing data."""
     power: int
+    # Timing data from frontend timing meter
+    timing_grade: Optional[str] = None  # "PERFECT", "GOOD", "MISS"
+    timing_error: Optional[float] = None  # 0.0 to 1.0
 
 
 class ShotRecordSchema(BaseModel):

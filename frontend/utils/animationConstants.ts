@@ -4,8 +4,8 @@
  * Import these constants in all animation-related components instead of hardcoding values
  */
 
-// Shot animation duration
-export const SHOT_DURATION = 1.8 // seconds
+// Shot animation duration (slightly longer for better visibility)
+export const SHOT_DURATION = 2.0 // seconds
 
 // Ball rotation speed during shot
 export const BALL_ROTATION_SPEED = 100 // degrees per second

@@ -38,11 +38,17 @@ class GameService:
     def select_shot(self, room_id: str, shot_type: ShotType) -> bool:
         """Handles shot selection."""
         game = self.get_game(room_id)
-        if not game or game.state != GameState.WAITING_FOR_SHOT.value:
+        if not game:
+            print(f"❌ select_shot: Game not found for room_id: {room_id}")
+            return False
+        
+        if game.state != GameState.WAITING_FOR_SHOT.value:
+            print(f"❌ select_shot: Invalid state. Expected WAITING_FOR_SHOT, got: {game.state}")
             return False
         
         game.shot_type = shot_type
         game.state = GameState.WAITING_FOR_DEFENSE.value
+        print(f"✅ select_shot: Shot selected successfully. New state: {game.state}")
         return True
     
     def select_defense(self, room_id: str, defense_type: DefenseType) -> bool:
@@ -55,8 +61,17 @@ class GameService:
         game.state = GameState.WAITING_FOR_POWER.value
         return True
     
-    def select_power(self, room_id: str, power: int) -> bool:
-        """Handles power selection and calculates shot result using new probability system."""
+    def select_power(
+        self, 
+        room_id: str, 
+        power: int,
+        timing_grade: str | None = None,
+        timing_error: float | None = None
+    ) -> bool:
+        """Handles power selection and calculates shot result using new probability system.
+        
+        Now supports timing data from frontend timing meter.
+        """
         game = self.get_game(room_id)
         if not game or game.state != GameState.WAITING_FOR_POWER.value:
             return False
@@ -86,23 +101,28 @@ class GameService:
             game.defense_state
         )
         
-        # Apply power modifier (legacy system had power affect percentage)
-        # Power affects the "look quality" - higher power = better execution
-        power_modifier = (power - 50) / 100.0  # -0.4 to +0.4 range
-        adjusted_probability = make_probability + power_modifier * 0.15  # ±6% max
+        # Apply timing modifier if provided (from frontend timing meter)
+        timing_modifier = 0.0
+        if timing_grade and timing_error is not None:
+            timing_modifier = self._get_timing_modifier(timing_grade, timing_error)
+        
+        # Apply power modifier (legacy fallback, smaller impact if timing is provided)
+        if timing_grade:
+            # If timing is provided, power modifier is minimal (just for backward compatibility)
+            power_modifier = (power - 50) / 100.0 * 0.03  # ±1.5% max when timing is used
+        else:
+            # Legacy behavior: power affects percentage more when no timing
+            power_modifier = (power - 50) / 100.0 * 0.15  # ±6% max
+        
+        adjusted_probability = make_probability + timing_modifier + power_modifier
         adjusted_probability = max(0.01, min(0.99, adjusted_probability))
         
         # Determine shot result
         import random
         game.shot_result = random.random() < adjusted_probability
         
-        # Update player score if shot was made
-        if game.shot_result:
-            points = 2 if shot_context.archetype in [ShotArchetype.RIM, ShotArchetype.PAINT, ShotArchetype.MIDRANGE] else 3
-            if points == 2:
-                game.current_offensive_player.two_pointer()
-            else:
-                game.current_offensive_player.three_pointer()
+        # NOTE: Score update moved to finish_animation() so it only updates after shot_result is shown
+        # Do NOT update score here - it will be updated when animation finishes
         
         # Track shot history after result is determined
         self._record_shot_with_context(game, shot_context, game.shot_result)
@@ -114,6 +134,38 @@ class GameService:
         )
         
         return True
+    
+    def _get_timing_modifier(self, timing_grade: str, timing_error: float) -> float:
+        """Calculate timing modifier based on grade and error.
+        
+        Args:
+            timing_grade: "PERFECT", "GOOD", or "MISS"
+            timing_error: 0.0 (perfect center) to 1.0 (maximum error)
+        
+        Returns:
+            Modifier to add to base probability
+        """
+        # Base modifiers
+        TIMING_MODIFIERS = {
+            "PERFECT": +0.10,  # +10% for perfect timing
+            "GOOD": +0.03,     # +3% for good timing
+            "MISS": -0.08,     # -8% for missed timing
+        }
+        
+        base_modifier = TIMING_MODIFIERS.get(timing_grade, 0.0)
+        
+        # Error reduces modifier effectiveness
+        # error = 0 → full modifier
+        # error = 1 → modifier reduced by 30%
+        ERROR_SCALE = 0.3
+        error_penalty = base_modifier * ERROR_SCALE * timing_error
+        
+        # For PERFECT/GOOD, error reduces bonus
+        # For MISS, error increases penalty
+        if timing_grade == "MISS":
+            return base_modifier - error_penalty  # More error = more penalty
+        else:
+            return base_modifier - error_penalty  # More error = less bonus
     
     def _create_shot_context_from_legacy(
         self,
@@ -232,10 +284,30 @@ class GameService:
             game.shot_history = game.shot_history[-20:]
     
     def finish_animation(self, room_id: str) -> bool:
-        """Marks animation as finished."""
+        """Marks animation as finished and updates score if shot was made."""
         game = self.get_game(room_id)
         if not game:
             return False
+        
+        # Only process if we're in ANIMATING state (prevent duplicate calls)
+        if game.state != GameState.ANIMATING.value:
+            print(f"⚠️ finish_animation called but state is {game.state}, not ANIMATING. Ignoring.")
+            return False
+        
+        # Update player score if shot was made (only after animation finishes, when shot_result is shown)
+        if game.shot_result and game.shot_type and game.defense_type:
+            # Recreate shot context to determine points based on archetype
+            shot_context = self._create_shot_context_from_legacy(
+                game.shot_type,
+                game.defense_type,
+                game.defense_state
+            )
+            # Determine points based on archetype
+            points = 2 if shot_context.archetype in [ShotArchetype.RIM, ShotArchetype.PAINT, ShotArchetype.MIDRANGE] else 3
+            if points == 2:
+                game.current_offensive_player.two_pointer()
+            else:
+                game.current_offensive_player.three_pointer()
         
         game.animation_finished = True
         game.state = GameState.SHOT_RESULT.value
@@ -244,7 +316,11 @@ class GameService:
     def next_turn(self, room_id: str) -> bool:
         """Moves to next turn."""
         game = self.get_game(room_id)
-        if not game or game.state != GameState.SHOT_RESULT.value:
+        if not game:
+            return False
+        
+        # Only allow next_turn if we're in SHOT_RESULT state
+        if game.state != GameState.SHOT_RESULT.value:
             return False
         
         if game.is_game_over():

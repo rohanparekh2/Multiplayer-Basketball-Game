@@ -4,6 +4,8 @@ export class WebSocketClient {
   private ws: WebSocket | null = null
   private roomId: string
   private onMessageCallback: ((data: GameStateResponse) => void) | null = null
+  private isReconnecting: boolean = false
+  private reconnectAttempts: number = 0
 
   constructor(roomId: string) {
     this.roomId = roomId
@@ -26,7 +28,11 @@ export class WebSocketClient {
         if (!resolved) {
           resolved = true
           clearTimeout(timeout)
-          console.log('WebSocket connected')
+          if (this.isReconnecting) {
+            console.log('WebSocket reconnected')
+          } else {
+            console.log('WebSocket connected')
+          }
           resolve()
         }
       }
@@ -55,10 +61,24 @@ export class WebSocketClient {
         console.log('WebSocket disconnected', event.code, event.reason)
         // Attempt reconnection if not a normal closure
         if (event.code !== 1000 && this.onMessageCallback) {
-          console.log('Attempting to reconnect...')
+          this.isReconnecting = true
+          this.reconnectAttempts++
+          console.log(`Attempting to reconnect... (attempt ${this.reconnectAttempts})`)
+          const delay = Math.min(3000 * this.reconnectAttempts, 10000) // Exponential backoff, max 10s
           setTimeout(() => {
-            this.connect().catch(console.error)
-          }, 3000)
+            this.connect()
+              .then(() => {
+                this.isReconnecting = false
+                this.reconnectAttempts = 0
+              })
+              .catch((error) => {
+                console.error('Reconnection failed:', error)
+                // Will retry on next close event
+              })
+          }, delay)
+        } else {
+          this.isReconnecting = false
+          this.reconnectAttempts = 0
         }
       }
     })

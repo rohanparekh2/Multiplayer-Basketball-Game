@@ -19,15 +19,16 @@ export function PowerMeter({ gameState }: PowerMeterProps) {
   const isReady = !!gameState?.room_id
 
   // Reset power when entering waiting_for_power state
+  // IMPORTANT: Only reset when explicitly entering waiting_for_power, not when leaving it
+  // This prevents race conditions where state might briefly change during power selection
   useEffect(() => {
+    // Only reset when we explicitly enter waiting_for_power state
+    // Don't reset when leaving it (that would interfere with state transitions)
     if (gameState.state === 'waiting_for_power' && !isSelecting) {
       setPower(0)
       setDirection(1)
-    } else if (gameState.state !== 'waiting_for_power') {
-      setPower(0)
-      setDirection(1)
-      setIsSelecting(false)
     }
+    // Don't reset when state changes away - let the state transition complete naturally
   }, [gameState.state, isSelecting])
 
   // Animate power meter
@@ -52,6 +53,10 @@ export function PowerMeter({ gameState }: PowerMeterProps) {
 
   const handleSpacePress = useCallback(
     async (e: KeyboardEvent) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:53',message:'handleSpacePress called',data:{keyCode:e.code,currentState:gameState.state,isSelecting,actionLoading,isReady,power},timestamp:Date.now(),runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      
       if (
         e.code === 'Space' && 
         gameState.state === 'waiting_for_power' && 
@@ -61,9 +66,17 @@ export function PowerMeter({ gameState }: PowerMeterProps) {
       ) {
         e.preventDefault()
         e.stopPropagation()
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:64',message:'Power selection starting',data:{room_id:gameState.room_id,power,adjustedPower:Math.floor((power / 100) * 80) + 10},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        
         setIsSelecting(true)
         
         if (!gameState.room_id) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:70',message:'No room_id error',data:{},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
           alert('Game not fully initialized. Please wait for the game to load completely.')
           setIsSelecting(false)
           return
@@ -71,12 +84,28 @@ export function PowerMeter({ gameState }: PowerMeterProps) {
         
         try {
           const adjustedPower = Math.floor((power / 100) * 80) + 10
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:76',message:'Calling selectPower',data:{adjustedPower,room_id:gameState.room_id},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
+          
           await selectPower(adjustedPower, gameState.room_id)
+          
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:79',message:'selectPower completed successfully',data:{},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
         } catch (error: any) {
+          // #region agent log
+          fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:82',message:'selectPower error',data:{error:error?.message,errorType:error?.constructor?.name},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          // #endregion
           console.error('❌ Error selecting power:', error)
           alert(`Error: ${error?.message || error}`)
           setIsSelecting(false)
         }
+      } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PowerMeter.tsx:88',message:'handleSpacePress conditions not met',data:{keyCode:e.code,state:gameState.state,isSelecting,actionLoading,isReady},timestamp:Date.now(),runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
       }
     },
     [gameState.state, gameState.room_id, power, isSelecting, actionLoading, selectPower, isReady]

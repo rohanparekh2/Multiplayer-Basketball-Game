@@ -92,6 +92,31 @@ async def get_game_state(room_id: str):
 @router.post("/{room_id}/shot")
 async def select_shot(room_id: str, shot_request: ShotRequest):
     """Selects a shot type. Supports both legacy (shot_type) and new (archetype) formats."""
+    import json
+    import os
+    
+    # #region agent log
+    log_data = {
+        "location": "game.py:93",
+        "message": "select_shot endpoint entry",
+        "data": {
+            "room_id": room_id,
+            "has_shot_type": shot_request.shot_type is not None,
+            "has_archetype": shot_request.archetype is not None,
+            "shot_type": str(shot_request.shot_type) if shot_request.shot_type else None,
+            "archetype": str(shot_request.archetype) if shot_request.archetype else None
+        },
+        "timestamp": int(os.times().elapsed * 1000) if hasattr(os.times(), 'elapsed') else 0,
+        "runId": "run1",
+        "hypothesisId": "SHOT_ERROR"
+    }
+    try:
+        with open("/Users/rohanparekh99/basketball_game/Multiplayer-Basketball-Game/.cursor/debug.log", "a") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except:
+        pass
+    # #endregion
+    
     # Backward compatibility: if shot_type is provided, use it
     if shot_request.shot_type:
         success = game_service.select_shot(room_id, shot_request.shot_type)
@@ -110,9 +135,61 @@ async def select_shot(room_id: str, shot_request: ShotRequest):
         mapped_type = archetype_map.get(shot_request.archetype, ShotType.MIDRANGE)
         success = game_service.select_shot(room_id, mapped_type)
     else:
+        # #region agent log
+        log_data = {
+            "location": "game.py:113",
+            "message": "select_shot: Neither shot_type nor archetype provided",
+            "data": {},
+            "timestamp": int(os.times().elapsed * 1000) if hasattr(os.times(), 'elapsed') else 0,
+            "runId": "run1",
+            "hypothesisId": "SHOT_ERROR"
+        }
+        try:
+            with open("/Users/rohanparekh99/basketball_game/Multiplayer-Basketball-Game/.cursor/debug.log", "a") as f:
+                f.write(json.dumps(log_data) + "\n")
+        except:
+            pass
+        # #endregion
         raise HTTPException(status_code=400, detail="Either shot_type or archetype must be provided")
     
+    # #region agent log
+    log_data = {
+        "location": "game.py:116",
+        "message": "select_shot: select_shot result",
+        "data": {
+            "success": success,
+            "room_id": room_id
+        },
+        "timestamp": int(os.times().elapsed * 1000) if hasattr(os.times(), 'elapsed') else 0,
+        "runId": "run1",
+        "hypothesisId": "SHOT_ERROR"
+    }
+    try:
+        with open("/Users/rohanparekh99/basketball_game/Multiplayer-Basketball-Game/.cursor/debug.log", "a") as f:
+            f.write(json.dumps(log_data) + "\n")
+    except:
+        pass
+    # #endregion
+    
     if not success:
+        # #region agent log
+        log_data = {
+            "location": "game.py:130",
+            "message": "select_shot: Invalid shot selection error",
+            "data": {
+                "room_id": room_id,
+                "success": success
+            },
+            "timestamp": int(os.times().elapsed * 1000) if hasattr(os.times(), 'elapsed') else 0,
+            "runId": "run1",
+            "hypothesisId": "SHOT_ERROR"
+        }
+        try:
+            with open("/Users/rohanparekh99/basketball_game/Multiplayer-Basketball-Game/.cursor/debug.log", "a") as f:
+                f.write(json.dumps(log_data) + "\n")
+        except:
+            pass
+        # #endregion
         raise HTTPException(status_code=400, detail="Invalid shot selection")
     game = game_service.get_game(room_id)
     game_state = game_to_response(game)
@@ -142,8 +219,13 @@ async def select_defense(room_id: str, defense_request: DefenseRequest):
 
 @router.post("/{room_id}/power")
 async def select_power(room_id: str, power_request: PowerRequest):
-    """Selects power and calculates shot result."""
-    success = game_service.select_power(room_id, power_request.power)
+    """Selects power and calculates shot result. Now supports timing data."""
+    success = game_service.select_power(
+        room_id, 
+        power_request.power,
+        timing_grade=power_request.timing_grade,
+        timing_error=power_request.timing_error
+    )
     if not success:
         raise HTTPException(status_code=400, detail="Invalid power selection")
     game = game_service.get_game(room_id)

@@ -61,11 +61,11 @@ export function calculateParabolicPoint(
  * For basketball shots: apex should be ABOVE the highest point (start or end)
  * For 3D perspective: apex should be around y=250-300 (between basket y=120 and player y=550)
  */
-export function calculateApex(start: Point, end: Point, height: number = 280): Point {
+export function calculateApex(start: Point, end: Point, height: number = 380): Point {
   const midX = (start.x + end.x) / 2
   // Basketball arc: apex is significantly higher, between start and end
   // The smaller y value is actually higher on screen (inverted y-axis)
-  // For 3D perspective: apex should be around 250-300px from top
+  // Increased height for more pronounced arc (was 280, now 380)
   const highestY = Math.min(start.y, end.y)
   return {
     x: midX,
@@ -148,9 +148,9 @@ export class Trajectory {
     difficulty: 'easy' | 'medium' | 'hard' = 'medium'
   ): Trajectory {
     const heightMultipliers = {
-      easy: 320,    // Higher arc, easier to make (for 3D perspective)
-      medium: 280,   // Standard arc (for 3D perspective)
-      hard: 240      // Lower arc, harder to make (for 3D perspective)
+      easy: 420,    // Higher arc, easier to make (for 3D perspective)
+      medium: 380,   // Standard arc (for 3D perspective) - increased for more arc
+      hard: 340      // Lower arc, harder to make (for 3D perspective)
     }
 
     const apex = calculateApex(start, end, heightMultipliers[difficulty])

@@ -1,192 +1,145 @@
 'use client'
 
-import { useEffect, useRef, useMemo, useState } from 'react'
-import { motion, useMotionValue } from 'framer-motion'
-import { Trajectory, Point } from '@/utils/trajectory'
-import { SVGBasketball } from './SVGBasketball'
-import { SHOT_DURATION, BALL_ROTATION_SPEED, RESULT_DELAY, ARC_FADE_DURATION } from '@/utils/animationConstants'
-import { ANCHORS, COURT } from '../Court/courtConstants'
-import { toSvg } from '@/utils/svgSpace'
+import { motion } from 'framer-motion'
+import { ANCHORS, D } from '../Court/courtConstants'
 
 interface SVGBallAnimationProps {
-  startPosition: [number, number, number] // [x, y, z] - z ignored in 2D
-  endPosition: [number, number, number]
   made: boolean
   onComplete: () => void
   debug?: boolean
 }
 
 /**
- * SVG ball animation using Framer Motion
- * Uses Trajectory utility for clean separation of animation math
- * Includes trajectory arc visualization
- * CRITICAL: Uses same viewBox as court (1100x850)
+ * SVG ball animation using Framer Motion keyframes
+ * Simple and reliable - uses different paths for made vs missed shots
  */
 export function SVGBallAnimation({
-  startPosition,
-  endPosition,
   made,
   onComplete,
   debug = false
 }: SVGBallAnimationProps) {
-  const completedRef = useRef(false)
-  const animationStartedRef = useRef(false)
-  const onCompleteRef = useRef(onComplete)
-  const [showArc, setShowArc] = useState(true)
-  
-  // Keep onComplete ref in sync
-  useEffect(() => {
-    onCompleteRef.current = onComplete
-  }, [onComplete])
+  const start = ANCHORS.startBall          // {x,y}
+  const rim = ANCHORS.rim                  // {x,y}
+  const baselineY = D.BOUNDS.bottom
 
-  // Convert 3D positions to 2D (SVG coordinates) using ANCHORS
-  // Use ANCHORS for consistent positioning
-  const svgStart: Point = useMemo(() => {
-    return toSvg({
-      x: ANCHORS.startBall.x + startPosition[0] * 20, // Center horizontally with spread
-      y: ANCHORS.startBall.y // Use ANCHORS.startBall.y
-    })
-  }, [startPosition])
+  // MADE: Higher, smoother arc with perfect trajectory
+  const madeApex = {
+    x: (start.x + rim.x) / 2,
+    y: Math.min(start.y, rim.y) - 280 // Higher arc for made shots
+  }
 
-  const svgEnd: Point = useMemo(() => {
-    return toSvg({
-      x: ANCHORS.rim.x + endPosition[0] * 20, // Basket x position (usually centered)
-      y: ANCHORS.rim.y // Use ANCHORS.rim.y
-    })
-  }, [endPosition])
+  // MISSED: Lower, flatter arc that hits rim at an angle
+  const missDir = Math.random() < 0.5 ? -1 : 1
+  const missApex = {
+    x: (start.x + rim.x) / 2 + missDir * 30, // Offset apex for angled approach
+    y: Math.min(start.y, rim.y) - 160 // Lower arc for missed shots
+  }
 
-  // Create trajectory with 3D perspective apex
-  const trajectory = useMemo(() => {
-    return new Trajectory({
-      start: svgStart,
-      end: svgEnd,
-      duration: SHOT_DURATION
-    })
-  }, [svgStart, svgEnd])
+  // MADE: Smooth arc to rim center, then clean drop straight down
+  const madePath = {
+    cx: [start.x, madeApex.x, rim.x, rim.x, rim.x],
+    cy: [start.y, madeApex.y, rim.y, rim.y + 50, rim.y + 120],
+    scale: [1, 1, 1, 1, 1],
+    rotate: [0, 45, 90, 135, 180],
+  }
 
-  // Generate arc path for visualization
-  const arcPath = useMemo(() => {
-    const keyPoints = trajectory.getKeyPoints()
-    const start = keyPoints.start
-    const apex = keyPoints.apex
-    const end = keyPoints.end
-    
-    // Create a smooth quadratic bezier curve: M start Q apex end
-    return `M ${start.x} ${start.y} Q ${apex.x} ${apex.y} ${end.x} ${end.y}`
-  }, [trajectory])
+  // MISSED: Angled arc to rim edge, then dramatic bounce away
+  const rimHitX = rim.x + missDir * 20 // Hit rim on the side
+  const bounceX = rim.x + missDir * 150
+  const bounceY = rim.y + 120
+  const missPath = {
+    cx: [start.x, missApex.x, rimHitX, bounceX, bounceX + missDir * 60],
+    cy: [start.y, missApex.y, rim.y, bounceY, bounceY + 100],
+    scale: [1, 1, 1, 1, 1],
+    rotate: [0, 90, 270, 450, 630], // More dramatic spin
+  }
 
-  // Motion values for ball position
-  const ballX = useMotionValue(svgStart.x)
-  const ballY = useMotionValue(svgStart.y)
-
-  // Reset animation state only once when component mounts (new shot)
-  // The key prop on SVGBallAnimation ensures this component remounts for each new shot
-  useEffect(() => {
-    completedRef.current = false
-    animationStartedRef.current = false
-    setShowArc(true)
-    ballX.set(svgStart.x)
-    ballY.set(svgStart.y)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run on mount
-
-  useEffect(() => {
-    // Prevent double animation
-    if (completedRef.current || animationStartedRef.current) return
-    
-    animationStartedRef.current = true
-    const startTime = Date.now()
-    const duration = trajectory.getDuration()
-    
-    const animate = () => {
-      // Double-check completion state
-      if (completedRef.current) return
-      
-      const elapsed = (Date.now() - startTime) / 1000
-      const progress = Math.min(elapsed / duration, 1)
-
-      if (progress >= 1) {
-        if (completedRef.current) return // Prevent double completion
-        
-        completedRef.current = true
-        ballX.set(svgEnd.x)
-        ballY.set(svgEnd.y)
-
-        // Hide arc after animation
-        setTimeout(() => {
-          setShowArc(false)
-        }, ARC_FADE_DURATION)
-
-        // Call onComplete after result delay (use ref to avoid re-triggering)
-        setTimeout(() => {
-          if (onCompleteRef.current) {
-            onCompleteRef.current()
-          }
-        }, RESULT_DELAY)
-
-        return
-      }
-
-      const result = trajectory.getPositionAtProgress(progress)
-      ballX.set(result.position.x)
-      ballY.set(result.position.y)
-
-      requestAnimationFrame(animate)
-    }
-
-    requestAnimationFrame(animate)
-  }, [trajectory, svgEnd, ballX, ballY])
+  const anim = made ? madePath : missPath
 
   return (
     <svg
-      viewBox={`0 0 ${COURT.W} ${COURT.H}`}
+      viewBox="0 0 1100 850"
       className="absolute inset-0 w-full h-full pointer-events-none"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Trajectory arc (fades out after animation) */}
-      {showArc && (
-        <motion.path
-          d={arcPath}
-          fill="none"
-          stroke="rgba(255, 255, 255, 0.3)"
-          strokeWidth="3"
-          strokeDasharray="5,5"
-          initial={{ opacity: 0.5 }}
-          animate={{ opacity: showArc ? 0.3 : 0 }}
-          transition={{ duration: ARC_FADE_DURATION / 1000 }}
+      {/* Animated basketball */}
+      <motion.circle
+        r="28"
+        fill="#ff6b00"
+        stroke="rgba(0,0,0,0.35)"
+        strokeWidth="3"
+        initial={{ cx: start.x, cy: start.y, scale: 1, rotate: 0 }}
+        animate={anim}
+        transition={{
+          duration: made ? 1.4 : 1.8, // Made is faster, miss is slower
+          times: made ? [0, 0.4, 0.65, 0.85, 1] : [0, 0.45, 0.6, 0.8, 1],
+          ease: made ? [0.4, 0, 0.2, 1] : [0.5, 0, 0.3, 1], // Smoother for made, more abrupt for miss
+        }}
+        onAnimationComplete={onComplete}
+      />
+
+      {/* Make effect - subtle rim flash when ball goes through */}
+      {made && (
+        <motion.circle
+          cx={rim.x}
+          cy={rim.y}
+          r={35}
+          fill="rgba(34, 197, 94, 0.2)"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: [0.8, 1.2, 1.4], opacity: [0, 0.5, 0] }}
+          transition={{ duration: 0.4, delay: 0.65 }}
         />
       )}
 
-      {/* Animated basketball */}
-      <motion.g
-        style={{
-          x: ballX,
-          y: ballY,
-        }}
-      >
-        <SVGBasketball
-          x={0}
-          y={0}
-          size={40}
-          rotationSpeed={BALL_ROTATION_SPEED}
-          rotating={true}
-        />
-      </motion.g>
+      {/* Miss effect - rim shake and red flash */}
+      {!made && (
+        <>
+          <motion.g
+            animate={{
+              x: [0, -4, 4, -3, 3, -2, 2, 0],
+              y: [0, -2, 2, -1, 1, 0],
+            }}
+            transition={{
+              delay: 0.6,
+              duration: 0.5,
+              ease: 'easeInOut',
+            }}
+          >
+            <circle
+              cx={rim.x}
+              cy={rim.y}
+              r="30"
+              fill="none"
+              stroke="rgba(239, 68, 68, 0.5)"
+              strokeWidth="3"
+            />
+          </motion.g>
+          <motion.circle
+            cx={rim.x}
+            cy={rim.y}
+            r={40}
+            fill="rgba(239, 68, 68, 0.25)"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: [0.8, 1.3, 1.5], opacity: [0, 0.5, 0] }}
+            transition={{ delay: 0.6, duration: 0.5 }}
+          />
+        </>
+      )}
 
       {/* Debug overlay */}
       {debug && (
         <g>
           {/* Start position (green circle) */}
           <circle
-            cx={svgStart.x}
-            cy={svgStart.y}
+            cx={start.x}
+            cy={start.y}
             r="8"
             fill="green"
             opacity="0.7"
           />
           <text
-            x={svgStart.x}
-            y={svgStart.y - 15}
+            x={start.x}
+            y={start.y - 15}
             fill="green"
             fontSize="12"
             textAnchor="middle"
@@ -195,17 +148,17 @@ export function SVGBallAnimation({
             START
           </text>
 
-          {/* End position (red circle at rim) */}
+          {/* Rim position (red circle) */}
           <circle
-            cx={svgEnd.x}
-            cy={svgEnd.y}
+            cx={rim.x}
+            cy={rim.y}
             r="8"
             fill="red"
             opacity="0.7"
           />
           <text
-            x={svgEnd.x}
-            y={svgEnd.y - 15}
+            x={rim.x}
+            y={rim.y - 15}
             fill="red"
             fontSize="12"
             textAnchor="middle"
@@ -214,15 +167,41 @@ export function SVGBallAnimation({
             RIM
           </text>
 
-          {/* Trajectory arc in debug color */}
-          <path
-            d={arcPath}
-            fill="none"
-            stroke="cyan"
-            strokeWidth="2"
-            strokeDasharray="3,3"
-            opacity="0.8"
+          {/* Apex (blue circle) */}
+          <circle
+            cx={apex.x}
+            cy={apex.y}
+            r="6"
+            fill="blue"
+            opacity="0.7"
           />
+          <text
+            x={apex.x}
+            y={apex.y - 15}
+            fill="blue"
+            fontSize="10"
+            textAnchor="middle"
+          >
+            APEX
+          </text>
+
+          {/* End position (yellow circle) */}
+          <circle
+            cx={anim.cx[anim.cx.length - 1]}
+            cy={anim.cy[anim.cy.length - 1]}
+            r="6"
+            fill="yellow"
+            opacity="0.7"
+          />
+          <text
+            x={anim.cx[anim.cx.length - 1]}
+            y={anim.cy[anim.cy.length - 1] - 15}
+            fill="yellow"
+            fontSize="10"
+            textAnchor="middle"
+          >
+            END ({made ? 'MADE' : 'MISS'})
+          </text>
         </g>
       )}
     </svg>

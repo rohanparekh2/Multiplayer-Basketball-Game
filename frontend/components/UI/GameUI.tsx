@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useGameState } from '@/hooks/useGameState'
 import { ShotSelection } from './ShotSelection'
 import { DefenseSelection } from './DefenseSelection'
-import { PowerMeter } from './PowerMeter'
+import { TimingMeterWrapper } from './TimingMeterWrapper'
 import { Scoreboard } from './Scoreboard'
 import { LeftControlPanel } from './LeftControlPanel'
 import { CoachPanel } from './CoachPanel'
@@ -249,9 +249,9 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
         {gameState.state === GameStateEnum.WAITING_FOR_POWER && gameState.room_id && (
           <LeftControlPanel
             title={String(gameState.current_offensive_player ?? 'Player')}
-            subtitle="Select power"
+            subtitle="Time your shot"
           >
-            <PowerMeter gameState={gameState} />
+            <TimingMeterWrapper gameState={gameState} />
           </LeftControlPanel>
         )}
         {gameState.state === GameStateEnum.ANIMATING && (
@@ -355,9 +355,9 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
           <LeftControlPanel
             key="power"
             title={String(gameState.current_offensive_player ?? 'Player')}
-            subtitle="Select power"
+            subtitle="Time your shot"
           >
-            <PowerMeter gameState={gameState} />
+            <TimingMeterWrapper gameState={gameState} />
           </LeftControlPanel>
         )}
         {gameState.state === GameStateEnum.ANIMATING && (

@@ -13,20 +13,31 @@ export function GameCanvas() {
   const [animationMade, setAnimationMade] = useState(false)
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const gameStateRef = useRef(gameState)
+  // Store shot result locally when we receive it from POST response
+  const shotResultRef = useRef<boolean | null>(null)
   
   // Keep ref in sync
   useEffect(() => {
     gameStateRef.current = gameState
+    // Capture shot_result when state becomes 'animating' - prioritize from gameState
+    if (gameState?.state === 'animating' && gameState.shot_result !== null && gameState.shot_result !== undefined) {
+      shotResultRef.current = gameState.shot_result
+      console.log('✅ Captured shot_result from gameState:', gameState.shot_result)
+    }
   }, [gameState])
 
   const handleAnimationComplete = useCallback(async () => {
-    console.log('🎬 Animation complete callback called')
+    console.log('🎬 GameCanvas animation complete callback called')
     
     // Clear timeout if it exists
     if (animationTimeoutRef.current) {
       clearTimeout(animationTimeoutRef.current)
       animationTimeoutRef.current = null
     }
+    
+    // Check if timing meter is being used (if power was set via timing meter, it will have timing data)
+    // For now, we'll call finishAnimation - if timing meter already called it, the backend will handle it gracefully
+    // TODO: Add a flag to prevent duplicate calls if needed
     
     const roomId = gameState?.room_id
     if (!roomId) {
@@ -101,11 +112,16 @@ export function GameCanvas() {
     
     // Only start animation if state changed to 'animating' (not if already animating)
     if (gameState?.state === 'animating' && animationStateRef.current !== 'animating') {
+      // Prioritize shot_result from gameState, fallback to ref, then false
+      // Backend sets shot_result before changing to ANIMATING, so it should be available
       const shotResult = gameState.shot_result !== null && gameState.shot_result !== undefined 
         ? gameState.shot_result 
-        : false
+        : (shotResultRef.current !== null ? shotResultRef.current : false)
       
-      console.log('✅ Starting animation with shot_result:', shotResult)
+      console.log('✅ Starting animation with shot_result:', shotResult, {
+        fromGameState: gameState.shot_result,
+        fromRef: shotResultRef.current
+      })
       setAnimationMade(shotResult)
       animationStateRef.current = 'animating'
       
@@ -136,6 +152,8 @@ export function GameCanvas() {
     } else if (gameState?.state !== 'animating') {
       // Reset animation state when leaving animating state
       animationStateRef.current = null
+      // Clear shot result ref when leaving animating state
+      shotResultRef.current = null
     }
     
     return () => {
@@ -203,11 +221,12 @@ export function GameCanvas() {
         <SVGCourt debug={debug} />
         
         {/* Render ball or animation based on state */}
+        {/* Note: When using TimingMeter, ShotResolutionAnimation is shown in TimingMeterWrapper instead */}
         {gameState?.state === 'animating' ? (
+          // Only show GameCanvas animation if we're not using timing meter
+          // Timing meter shows its own animation in the UI panel
           <SVGBallAnimation
-            key={`animation-${gameState?.shot_result}-${gameState?.power}`}
-            startPosition={[0, 2, 0]}
-            endPosition={animationMade ? [0, 3, -9.5] : [2, 1, -9]}
+            key={`animation-${gameState?.shot_history?.length || 0}-${gameState?.shot_type || 'none'}-${gameState?.power || 0}-${animationMade}`}
             made={animationMade}
             onComplete={() => {
               console.log('🎬 SVGBallAnimation onComplete called')
