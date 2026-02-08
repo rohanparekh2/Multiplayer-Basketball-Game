@@ -215,7 +215,7 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
   if (mode === 'right') {
     if (!gameState) return null
     return (
-      <div className="flex flex-col gap-2 w-full h-full overflow-hidden">
+      <div className="flex flex-col gap-2 w-full h-full overflow-y-auto">
         <div className="flex-shrink-0">
           <Scoreboard gameState={gameState} />
         </div>

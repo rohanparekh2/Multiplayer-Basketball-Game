@@ -46,7 +46,7 @@ export default function Home() {
           </div>
 
           {/* Right column - Scoreboard */}
-          <div className="flex items-start justify-center p-4 overflow-hidden">
+          <div className="flex items-start justify-center p-4 overflow-y-auto">
             <GameUI mode="right" />
           </div>
         </main>

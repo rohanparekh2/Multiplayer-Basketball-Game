@@ -23,18 +23,16 @@ class CoachAdvice:
 class CoachAIService:
     """LLM-powered coach that provides strategic advice."""
     
-    COACH_SYSTEM_PROMPT = """You are a basketball coach analyzing a player's performance. 
+    COACH_SYSTEM_PROMPT = """You are a basketball coach providing concise strategic advice. 
 Given shot history, defense state, and game situation, provide:
 1. Recommended next shot (archetype, subtype, zone)
-2. Brief explanation (1-2 sentences)
-3. Reasoning that MUST explain:
+2. Brief explanation (1 sentence max)
+3. Short reasoning (2-3 sentences max) covering:
    - Expected points (probability * points)
-   - Why this shot is open/better than alternatives
-   - Defense tendencies (e.g., "they're over-helping, corner is open 72%")
-4. Optional challenge
+   - Why this shot is better (key reason only)
+4. Optional challenge (1 sentence max)
 
-IMPORTANT: Your reasoning must be consistent with the expected points calculation.
-If you recommend a corner 3, explain why it has higher expected value than other options.
+KEEP IT CONCISE. Be direct and brief. No long explanations.
 
 Return JSON: {"recommended_shot": {"archetype": "...", "subtype": "...", "zone": "..."}, "advice_text": "...", "reasoning": "...", "challenge": "..."}"""
     
@@ -52,10 +50,40 @@ Return JSON: {"recommended_shot": {"archetype": "...", "subtype": "...", "zone":
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=api_key)
-                self.client = genai.GenerativeModel('gemini-pro')
+                # Try to list available models first to see what's available
+                try:
+                    models = genai.list_models()
+                    available_models = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+                    print(f"📋 Coach AI: Available Gemini models: {available_models}")
+                    
+                    # Try gemini-1.0-pro first (most stable), then fallback to others
+                    if 'models/gemini-1.0-pro' in available_models:
+                        model_name = 'gemini-1.0-pro'
+                    elif 'models/gemini-1.5-flash' in available_models:
+                        model_name = 'gemini-1.5-flash'
+                    elif 'models/gemini-1.5-pro' in available_models:
+                        model_name = 'gemini-1.5-pro'
+                    elif 'models/gemini-pro' in available_models:
+                        model_name = 'gemini-pro'
+                    else:
+                        # Use first available model
+                        model_name = available_models[0].replace('models/', '') if available_models else 'gemini-1.0-pro'
+                        print(f"⚠️ Coach AI: Using first available model: {model_name}")
+                except Exception as e:
+                    print(f"⚠️ Coach AI: Could not list models, using default: {e}")
+                    model_name = 'gemini-1.0-pro'
+                
+                self.client = genai.GenerativeModel(model_name)
+                print(f"✅ Coach AI: Gemini API initialized successfully (API key: {api_key[:10]}...)")
+                print(f"✅ Coach AI: Using model: {model_name}")
             except ImportError:
-                print("Warning: google-generativeai not installed. Coach will use rule-based fallback.")
+                print("⚠️ Warning: google-generativeai not installed. Coach will use rule-based fallback.")
                 self._use_llm = False
+            except Exception as e:
+                print(f"❌ Error initializing Gemini API: {e}. Coach will use rule-based fallback.")
+                self._use_llm = False
+        else:
+            print("ℹ️ Coach AI: No API key provided. Using rule-based fallback.")
     
     def _compute_state_hash(self, game_state: Dict) -> str:
         """Compute hash from meaningful game state changes."""
@@ -192,6 +220,7 @@ Shot History (last 10):
         # Cache miss or expired
         if self._use_llm:
             try:
+                print("🤖 Coach AI: Calling Gemini API...")
                 prompt = self._build_prompt(game_state)
                 # Combine system prompt and user prompt for Gemini
                 full_prompt = f"{self.COACH_SYSTEM_PROMPT}\n\n{prompt}\n\nReturn your response as valid JSON only."
@@ -203,6 +232,8 @@ Shot History (last 10):
                         temperature=0.7,
                     )
                 )
+                
+                print(f"✅ Coach AI: Gemini API response received (length: {len(response.text)} chars)")
                 
                 # Extract JSON from response (Gemini may wrap it in markdown code blocks)
                 response_text = response.text.strip()
@@ -216,6 +247,7 @@ Shot History (last 10):
                 response_text = response_text.strip()
                 
                 advice_dict = json.loads(response_text)
+                print(f"✅ Coach AI: Successfully parsed JSON response")
                 
                 # Calculate expected_points
                 expected_points = self._calculate_expected_points(
@@ -231,10 +263,13 @@ Shot History (last 10):
                     challenge=advice_dict.get("challenge"),
                 )
             except Exception as e:
-                print(f"Error calling LLM: {e}. Falling back to rule-based advice.")
+                print(f"❌ Coach AI: Error calling Gemini API: {e}")
+                print(f"   Error type: {type(e).__name__}")
+                print(f"   Falling back to rule-based advice.")
                 advice = self._get_rule_based_advice(game_state)
         else:
             # Use rule-based fallback
+            print("ℹ️ Coach AI: Using rule-based fallback (no LLM)")
             advice = self._get_rule_based_advice(game_state)
         
         # Cache it
@@ -265,6 +300,10 @@ def get_coach_service() -> CoachAIService:
     if coach_ai_service is None:
         import os
         api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            print(f"🔑 Coach AI: GEMINI_API_KEY found in environment (length: {len(api_key)} chars)")
+        else:
+            print("⚠️ Coach AI: GEMINI_API_KEY not found in environment variables")
         coach_ai_service = CoachAIService(api_key=api_key)
     return coach_ai_service
 
