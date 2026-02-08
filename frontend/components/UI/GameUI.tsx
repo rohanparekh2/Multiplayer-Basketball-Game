@@ -19,11 +19,11 @@ import { setDebugLogCallback } from '@/services/api'
 import { setDebugLogCallback as setStateDebugCallback } from '@/hooks/useGameState'
 import { gameApi } from '@/services/api'
 import { GameState as GameStateEnum } from '@/types/game'
-import { Trophy, CheckCircle2, XCircle, RefreshCw, SkipForward } from 'lucide-react'
+import { Trophy, RefreshCw, SkipForward } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { calculateMakePct } from '@/utils/offense'
 import { ShotType, ShotArchetype, ShotZone, ContestLevel, GameStateResponse } from '@/types/game'
-import { determineContestLevel } from './TimingMeterExample'
+import { determineContestLevel } from '@/utils/defense'
 import { DefenseChangeNotification } from './DefenseChangeNotification'
 
 export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overlay' }) {
@@ -77,29 +77,14 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
   }
 
   useEffect(() => {
-    console.log('🎮 GameUI useEffect check:', { 
-      hasGameState: !!gameState, 
-      loading, 
-      shouldCreate: !gameState && !loading,
-      gameCreationAttempted: gameCreationAttempted.current
-    })
-    
     if (!gameState && !loading && !gameCreationAttempted.current) {
       gameCreationAttempted.current = true
-      console.log('🎮 No game state, creating new game...')
       createGame()
-        .then((result) => {
-          console.log('✅ Game creation completed:', result)
+        .then(() => {
           gameCreationAttempted.current = false // Reset on success
         })
         .catch((err) => {
-          console.error('❌ Failed to create game:', err)
-          console.error('❌ Error details:', {
-            message: err.message,
-            response: err.response?.data,
-            status: err.response?.status,
-            stack: err.stack,
-          })
+          console.error('Failed to create game:', err)
           gameCreationAttempted.current = false // Reset on error so we can retry
         })
     }
@@ -107,16 +92,8 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
 
   // Verify game state is properly initialized
   useEffect(() => {
-    if (gameState) {
-      console.log('✅ Game state initialized:', {
-        room_id: gameState.room_id,
-        state: gameState.state,
-        player_one: gameState.player_one?.name,
-        player_two: gameState.player_two?.name,
-      })
-      if (!gameState.room_id) {
-        console.error('❌ Game state missing room_id!')
-      }
+    if (gameState && !gameState.room_id) {
+      console.error('Game state missing room_id!')
     }
   }, [gameState])
 
@@ -146,34 +123,9 @@ export function GameUI({ mode = 'overlay' }: { mode?: 'left' | 'right' | 'overla
     }
   }, [error, showToast])
 
-  // Debug: Log state changes
-  useEffect(() => {
-    if (gameState) {
-      console.log('Game state updated:', {
-        state: gameState.state,
-        offensive: gameState.current_offensive_player,
-        defensive: gameState.current_defensive_player,
-        shot_type: gameState.shot_type,
-        defense_type: gameState.defense_type,
-      })
-    }
-  }, [gameState])
-
   const handleNextTurn = async () => {
     await nextTurn()
   }
-
-  // Debug logging
-  useEffect(() => {
-    console.log('🎮 GameUI render:', { 
-      loading, 
-      hasGameState: !!gameState, 
-      gameStateValue: gameState,
-      gameStateRoomId: gameState?.room_id,
-      gameStateState: gameState?.state,
-      error 
-    })
-  }, [loading, gameState, error])
 
   // More specific check: gameState must exist AND have either a room_id OR a valid state
   // If gameState has a state property, it means the game was initialized
@@ -495,14 +447,6 @@ function ShootingInfo({ gameState }: { gameState: GameStateResponse }) {
     console.error('Error calculating make percentage:', error)
     // Use default value
   }
-
-  console.log('ShootingInfo render:', { 
-    shot_type: gameState.shot_type, 
-    defense_state: gameState.defense_state,
-    power: gameState.power,
-    makePct,
-    hasPower: gameState.power !== null && gameState.power !== undefined
-  })
 
   // Always render, even if we have to use a default value
   return (

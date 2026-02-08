@@ -6,7 +6,7 @@ import { useGameState } from '@/hooks/useGameState'
 import { gameApi } from '@/services/api'
 import { GameStateResponse, ShotType, ShotArchetype, ShotZone, ContestLevel } from '@/types/game'
 import { calculateMakePct } from '@/utils/offense'
-import { determineContestLevel } from './TimingMeterExample'
+import { determineContestLevel } from '@/utils/defense'
 
 interface TimingMeterWrapperProps {
   gameState: GameStateResponse
@@ -51,7 +51,6 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
   const handleTimingLockIn = async (result: TimingResult) => {
     if (isProcessing || !gameState.room_id) return
 
-    console.log('🎯 Timing locked in:', result)
     setTimingResult(result)
     setIsProcessing(true)
 
@@ -68,7 +67,6 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
       })
 
       setFinalProbability(finalPct)
-      console.log('📊 Frontend calculated probability:', finalPct)
 
       // Call selectPower with timing data so backend can use it in calculation
       // Backend will calculate its own probability WITH timing and determine result
@@ -90,13 +88,12 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
         throw new Error('Failed to select power')
       }
       
-      console.log('✅ selectPower completed, state should transition to animating')
       // The selectPower function already updates the game state from the API response
       // The animation will trigger automatically when gameState.state becomes 'animating'
 
       setIsProcessing(false)
     } catch (error: any) {
-      console.error('❌ Error processing timing:', error)
+      console.error('Error processing timing:', error)
       alert(`Error: ${error?.message || error}`)
       setIsProcessing(false)
       setTimingResult(null)
@@ -108,7 +105,6 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
   useEffect(() => {
     if (timingResult && gameState?.state === 'animating' && gameState?.shot_result !== null && gameState?.shot_result !== undefined) {
       setShotMade(gameState.shot_result)
-      console.log('🏀 Shot result from game state:', gameState.shot_result)
     }
   }, [timingResult, gameState?.state, gameState?.shot_result])
 
@@ -118,11 +114,9 @@ export function TimingMeterWrapper({ gameState }: TimingMeterWrapperProps) {
     if (timingResult && gameState?.room_id && gameState?.state === 'animating') {
       const timeout = setTimeout(async () => {
         try {
-          console.log('🎬 TimingMeterWrapper: Calling finishAnimation...')
           await gameApi.finishAnimation(gameState.room_id!)
-          console.log('✅ TimingMeterWrapper: finishAnimation completed')
         } catch (error: any) {
-          console.error('❌ Error calling finishAnimation:', error)
+          console.error('Error calling finishAnimation:', error)
         }
       }, 2800) // Wait for court animation to complete (matches longer animation duration)
       return () => clearTimeout(timeout)

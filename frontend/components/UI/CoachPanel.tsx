@@ -6,7 +6,7 @@ import { gameApi } from '@/services/api'
 import { motion } from 'framer-motion'
 import { calculateMakePct, CalculateMakePctParams } from '@/utils/offense'
 import { TimingGrade } from '@/components/UI/TimingMeter'
-import { determineContestLevel } from './TimingMeterExample'
+import { determineContestLevel } from '@/utils/defense'
 
 interface CoachAdvice {
   recommended_shot: {

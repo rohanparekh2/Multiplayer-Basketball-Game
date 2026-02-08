@@ -23,13 +23,10 @@ export function GameCanvas() {
     // Capture shot_result when state becomes 'animating' - prioritize from gameState
     if (gameState?.state === 'animating' && gameState.shot_result !== null && gameState.shot_result !== undefined) {
       shotResultRef.current = gameState.shot_result
-      console.log('✅ Captured shot_result from gameState:', gameState.shot_result)
     }
   }, [gameState])
 
   const handleAnimationComplete = useCallback(async () => {
-    console.log('🎬 GameCanvas animation complete callback called')
-    
     // Clear timeout if it exists
     if (animationTimeoutRef.current) {
       clearTimeout(animationTimeoutRef.current)
@@ -42,10 +39,8 @@ export function GameCanvas() {
     
     const roomId = gameState?.room_id
     if (!roomId) {
-      console.error('❌ No room_id available for finishAnimation')
       const refRoomId = gameStateRef.current?.room_id
       if (refRoomId) {
-        console.log('🔄 Using room_id from ref:', refRoomId)
         await handleAnimationCompleteWithRoomId(refRoomId)
       }
       return
@@ -57,47 +52,30 @@ export function GameCanvas() {
   const handleAnimationCompleteWithRoomId = useCallback(async (roomId: string) => {
     const currentState = gameStateRef.current?.state
     if (currentState !== 'animating') {
-      console.warn('⚠️ State is not animating, skipping finishAnimation:', currentState)
       return
     }
 
     try {
-      console.log('🎬 Notifying backend that animation is complete...', { roomId })
-      
       const response = await gameApi.finishAnimation(roomId)
-      console.log('✅ Animation finished response:', response)
       
       if (response?.game_state) {
-        const newState = response.game_state.state
-        console.log('✅ State transition:', { from: 'animating', to: newState })
-        
-        const refreshSuccess = await refreshGameState(roomId)
-        if (!refreshSuccess) {
-          console.warn('⚠️ State refresh failed, but API call succeeded')
-        }
+        await refreshGameState(roomId)
       } else {
-        console.warn('⚠️ Response missing game_state, refreshing...')
         await refreshGameState(roomId)
       }
       
       setTimeout(async () => {
         const checkState = gameStateRef.current?.state
         if (checkState === 'animating') {
-          console.warn('⚠️ Still animating after finishAnimation, forcing refresh again')
           await refreshGameState(roomId, 2)
         }
       }, 500)
     } catch (error: any) {
-      console.error('❌ Failed to notify animation complete:', error)
-      
-      console.log('🔄 Attempting to refresh game state as fallback...')
+      console.error('Failed to notify animation complete:', error)
       try {
-        const refreshSuccess = await refreshGameState(roomId, 2)
-        if (!refreshSuccess) {
-          console.error('❌ State refresh also failed after animation completion error')
-        }
+        await refreshGameState(roomId, 2)
       } catch (refreshError) {
-        console.error('❌ Failed to refresh state:', refreshError)
+        console.error('Failed to refresh state:', refreshError)
       }
     }
   }, [refreshGameState])
@@ -133,19 +111,18 @@ export function GameCanvas() {
       animationTimeoutRef.current = setTimeout(async () => {
         const currentState = gameStateRef.current?.state
         const currentRoomId = gameStateRef.current?.room_id
-        console.warn('⚠️ Animation timeout - forcing completion after 5 seconds')
         
         // Only force completion if still in animating state
         if (currentState === 'animating' && currentRoomId) {
           try {
             await handleAnimationComplete()
           } catch (err) {
-            console.error('❌ Error in timeout handler:', err)
+            console.error('Error in timeout handler:', err)
             try {
               await gameApi.finishAnimation(currentRoomId)
               await refreshGameState(currentRoomId)
             } catch (apiErr) {
-              console.error('❌ Direct finishAnimation also failed:', apiErr)
+              console.error('Direct finishAnimation also failed:', apiErr)
             }
           }
         }
@@ -233,9 +210,8 @@ export function GameCanvas() {
             key={`animation-${gameState?.shot_history?.length || 0}-${gameState?.shot_type || 'none'}-${gameState?.power || 0}-${animationMade}`}
             made={animationMade}
             onComplete={() => {
-              console.log('🎬 SVGBallAnimation onComplete called')
               handleAnimationComplete().catch((err) => {
-                console.error('❌ Error in handleAnimationComplete:', err)
+                console.error('Error in handleAnimationComplete:', err)
               })
             }}
             debug={debug}

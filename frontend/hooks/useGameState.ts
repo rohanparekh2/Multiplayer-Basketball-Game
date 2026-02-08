@@ -135,11 +135,7 @@ export function useGameState() {
     try {
       setLoading(true)
       setError(null)
-      console.log('🎮 Creating game...', { playerOneName, playerTwoName })
-      console.log('🎮 API base URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
-      
       const state = await gameApi.createGame(playerOneName, playerTwoName)
-      console.log('✅ Game created, full response:', JSON.stringify(state, null, 2))
       
       // Verify state has room_id
       if (!state) {
@@ -171,7 +167,6 @@ export function useGameState() {
           fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGameState.ts:121',message:'WebSocket message received',data:{hasData:!!data,dataState:data?.state,currentState:gameStateRef.current?.state},timestamp:Date.now(),runId:'run1',hypothesisId:'C'})}).catch(()=>{});
           // #endregion
           
-          console.log('📨 WebSocket message received:', data)
           debugLogCallback?.({
             type: 'websocket',
             message: 'WebSocket message received',
@@ -267,7 +262,6 @@ export function useGameState() {
           }
         })
         setWsClient(client)
-        console.log('✅ WebSocket connected')
       } catch (wsError: any) {
         console.warn('⚠️ WebSocket connection failed, continuing without real-time updates:', wsError)
         setWsConnected(false)
@@ -278,7 +272,6 @@ export function useGameState() {
       const elapsed = Date.now() - startTime
       const remainingTime = Math.max(0, minLoadingTime - elapsed)
       if (remainingTime > 0) {
-        console.log(`⏳ Waiting ${remainingTime}ms to complete minimum loading time...`)
         await new Promise(resolve => setTimeout(resolve, remainingTime))
       }
     } catch (err: any) {
@@ -294,7 +287,6 @@ export function useGameState() {
       }
     } finally {
       setLoading(false)
-      console.log('✅ Loading complete, game ready')
     }
   }, [])
 
@@ -473,37 +465,11 @@ export function useGameState() {
       fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGameState.ts:315',message:'Before API call',data:{room_id,power},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       
-      console.log('📡 Calling API: selectPower', { room_id, power, timingGrade, timingError })
       const response = await gameApi.selectPower(room_id, power, timingGrade, timingError)
       
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGameState.ts:318',message:'API response received',data:{hasGameState:!!response?.game_state,newState:response?.game_state?.state},timestamp:Date.now(),runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      
-      console.log('✅ Power selection API response:', response)
       if (response?.game_state) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGameState.ts:320',message:'Before setGameState',data:{oldState:gameStateRef.current?.state,newState:response.game_state.state},timestamp:Date.now(),runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
-        
-        console.log('✅ Updating game state from response:', {
-          state: response.game_state.state,
-          shot_result: response.game_state.shot_result,
-          player_one_score: response.game_state.player_one?.score,
-          player_two_score: response.game_state.player_two?.score,
-          power: response.game_state.power,
-        })
         setGameState(response.game_state)
         gameStateRef.current = response.game_state
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/9e385bef-2f3f-458b-a86f-d3ed3bdb0205',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useGameState.ts:332',message:'After setGameState',data:{state:response.game_state.state},timestamp:Date.now(),runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
-        
-        // If state is animating, the animation should trigger automatically via useEffect
-        if (response.game_state.state === 'animating') {
-          console.log('🎬 State set to animating, animation should start now')
-        }
         
         return true
       } else {
@@ -544,15 +510,11 @@ export function useGameState() {
       console.error('❌ No room_id available for next turn')
       return
     }
-    console.log('➡️ nextTurn called:', { room_id })
     try {
       setActionLoading('nextTurn')
       setError(null)
-      console.log('📡 Calling API: nextTurn', { room_id })
       const response = await gameApi.nextTurn(room_id)
-      console.log('✅ Next turn API response:', response)
       if (response?.game_state) {
-        console.log('✅ Updating game state from response:', response.game_state)
         setGameState(response.game_state)
         gameStateRef.current = response.game_state
       } else {
@@ -621,7 +583,6 @@ export function useGameState() {
           // Force finishAnimation when polling times out
           try {
             const response = await gameApi.finishAnimation(roomId)
-            console.log('✅ Forced finishAnimation response:', response)
             debugLogCallback?.({
               type: 'api',
               message: 'Forced finishAnimation after polling timeout',
@@ -648,14 +609,12 @@ export function useGameState() {
         
         // If minimum animation time hasn't passed, just wait
         if (elapsed < minAnimationTime) {
-          console.log(`⏳ Waiting for minimum animation time: ${elapsed}ms / ${minAnimationTime}ms`)
           return
         }
 
         // Check if state has changed (no longer animating)
         const currentState = gameStateRef.current?.state
         if (currentState !== 'animating') {
-          console.log('✅ State changed during polling, stopping:', currentState)
           if (pollingIntervalRef) {
             clearInterval(pollingIntervalRef)
             pollingIntervalRef = null
@@ -665,7 +624,6 @@ export function useGameState() {
         }
 
         // Poll the backend
-        console.log(`🔄 Polling game state (attempt ${pollCount}/${maxPolls})`)
         debugLogCallback?.({
           type: 'poll',
           message: `Polling game state (attempt ${pollCount}/${maxPolls})`,
@@ -675,7 +633,6 @@ export function useGameState() {
         if (success) {
           const newState = gameStateRef.current?.state
           if (newState !== 'animating') {
-            console.log('✅ Polling detected state change:', newState)
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current)
               pollingIntervalRef.current = null

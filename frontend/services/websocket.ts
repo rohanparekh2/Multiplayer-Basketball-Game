@@ -31,11 +31,6 @@ export class WebSocketClient {
         if (!resolved) {
           resolved = true
           clearTimeout(timeout)
-          if (this.isReconnecting) {
-            console.log('WebSocket reconnected')
-          } else {
-            console.log('WebSocket connected')
-          }
           resolve()
         }
       }
@@ -64,7 +59,6 @@ export class WebSocketClient {
       }
 
       this.ws.onclose = (event) => {
-        console.log('WebSocket disconnected', event.code, event.reason)
         
         // Clear any existing reconnect timeout
         if (this.reconnectTimeout) {
@@ -100,7 +94,6 @@ export class WebSocketClient {
             this.reconnectTimeout = null
             this.connect()
               .then(() => {
-                console.log('✅ WebSocket reconnected successfully')
                 this.isReconnecting = false
                 this.reconnectAttempts = 0
               })

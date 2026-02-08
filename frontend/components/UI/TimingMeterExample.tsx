@@ -40,8 +40,6 @@ export function TimingMeterExample({
   const [finalProbability, setFinalProbability] = useState(0)
 
   const handleTimingLockIn = (result: TimingResult) => {
-    console.log('🎯 Timing locked in:', result)
-    
     setTimingResult(result)
 
     // Calculate final make probability using calculateMakePct()
@@ -56,12 +54,6 @@ export function TimingMeterExample({
     })
     
     setFinalProbability(finalPct)
-    console.log('📊 Probability calculation:', {
-      archetype,
-      subtype,
-      zone,
-      contestLevel,
-      timingGrade: result.grade,
       timingError: result.error,
       final: finalPct,
     })
@@ -72,8 +64,6 @@ export function TimingMeterExample({
     
     setShotMade(made)
     setShowAnimation(true)
-    
-    console.log('🏀 Shot result:', { made, random, threshold: finalPct })
   }
 
   const handleAnimationComplete = () => {

@@ -2,12 +2,7 @@ import hashlib
 import json
 import time
 from typing import Dict, Tuple, Optional
-from dataclasses import dataclass, asdict
-from app.models.game import Game
-from app.models.shot_archetypes import ShotArchetype, ShotZone
-from app.models.offense import Offense
-from app.models.shot_context import ShotContext
-from app.models.shot_archetypes import DribbleState, ContestLevel
+from dataclasses import dataclass
 
 
 @dataclass
