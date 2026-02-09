@@ -39,3 +39,6 @@ Thumbs.db
 build/
 *.egg-info/
 
+*.md
+!README.md
+!README.MD

@@ -1,6 +1,6 @@
 # Basketball Game Frontend
 
-Next.js frontend with SVG-based 2D graphics and Framer Motion animations.
+Next.js frontend with TypeScript, SVG-based 2D graphics, and Framer Motion animations.
 
 ## Setup
 
@@ -26,14 +26,14 @@ NEXT_PUBLIC_WS_URL=ws://localhost:8000
 
 ## Architecture
 
-- `app/` - Next.js app directory
-- `components/` - React components
+- `app/` - Next.js app directory (TypeScript)
+- `components/` - React components (TypeScript)
   - `GameCanvas/` - SVG game canvas container
-  - `Court/` - SVG basketball court
-  - `Basketball/` - SVG basketball with animations
-  - `UI/` - Game UI components
-- `hooks/` - Custom React hooks
+  - `Court/` - SVG basketball court and zone overlays
+  - `Basketball/` - SVG basketball with Framer Motion animations
+  - `UI/` - Game UI components (timing meter, coach panel, scoreboard, etc.)
+- `hooks/` - Custom React hooks (useGameState, etc.)
 - `services/` - API and WebSocket clients
 - `types/` - TypeScript type definitions
-- `utils/` - Utility functions (trajectory calculations)
+- `utils/` - Utility functions (offense calculations, defense utilities)
 
